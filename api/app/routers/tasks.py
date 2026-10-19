@@ -8,7 +8,7 @@ from ..models import Job, Task, User
 from ..rules.constants import TASK_OPEN
 from ..schemas import TaskComplete, TaskCreate, TaskUpdate
 from ..serialize import row
-from ..services.jobs import get_job
+from ..services.jobs import get_job, refuse_nulls
 from ..services.tasks import active_user, complete, create_task
 
 router = APIRouter(tags=["tasks"])
@@ -40,6 +40,7 @@ def update_task(task_id: int, body: TaskUpdate, db: Session = Depends(get_db), _
         raise HTTPException(422, "A task needs a title.")
     if data.get("assignee_id") is not None:
         active_user(db, data["assignee_id"])
+    refuse_nulls(data, "severity")
     if "due_date" in data and data["due_date"] is None:
         raise HTTPException(422, "A task can't lose its due date.")
     if "assignee_id" in data and data["assignee_id"] is None:

@@ -100,3 +100,27 @@ def test_assignee_suggestions_follow_habits(boss, jay, office):
         jay.post(f"/api/jobs/{job['id']}/tasks", json={"title": "x", "assignee_id": office.id, "due_date": "2030-01-01"})
     r = jay.get("/api/users/assignee-suggestions")
     assert r.json()[0]["id"] == office.id
+
+
+def test_merge_does_not_leave_two_active_designers(boss, jay):
+    real = new_entity(jay, "Rifky Freund", "845-555-0101")
+    dupe = new_entity(jay, "Rifky F.")
+    job = new_job(jay, people=[{"entity_id": real["id"], "role": "designer"}])
+    jay.post(f"/api/jobs/{job['id']}/roles", json={"entity_id": dupe["id"], "role": "other"})
+    jay.post(f"/api/jobs/{job['id']}/roles", json={"entity_id": dupe["id"], "role": "designer"})
+    # dupe is now the active designer; real was ended by the cap. Merge dupe into real.
+    boss.post(f"/api/entities/{dupe['id']}/merge-into/{real['id']}")
+    roles = jay.get(f"/api/jobs/{job['id']}").json()["roles"]
+    active_designers = [r for r in roles if r["role"] == "designer" and r["active"]]
+    assert len(active_designers) == 1 and active_designers[0]["entity"]["id"] == real["id"]
+
+
+def test_blanking_a_required_field_is_refused_not_a_crash(boss, jay):
+    assert boss.patch(f"/api/users/{jay.id}", json={"role": None}).status_code == 422
+    e = new_entity(jay, "Someone")
+    assert jay.patch(f"/api/entities/{e['id']}", json={"kind": None}).status_code == 422
+    assert jay.patch(f"/api/entities/{e['id']}", json={"company_id": 99999}).status_code == 422
+
+
+def test_negative_limit_is_not_a_crash(jay):
+    assert jay.get("/api/entities", params={"limit": -1}).status_code == 200

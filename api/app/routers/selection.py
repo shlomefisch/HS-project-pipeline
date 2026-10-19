@@ -20,7 +20,7 @@ from ..schemas import (
     TagUpdate,
 )
 from ..serialize import row
-from ..services.jobs import get_job
+from ..services.jobs import get_job, refuse_nulls
 from ..timeutil import now, today
 
 router = APIRouter(tags=["selection"])
@@ -53,6 +53,9 @@ def update_area(area_id: int, body: AreaUpdate, db: Session = Depends(get_db), _
     if area is None:
         raise HTTPException(404, "Area not found.")
     data = body.model_dump(exclude_unset=True)
+    refuse_nulls(data, "name", "status", "sort_order")
+    if "name" in data and not data["name"].strip():
+        raise HTTPException(422, "An area needs a name.")
     status = data.get("status")
     if status == "on_hold":
         until, reason = data.get("hold_until") or area.hold_until, data.get("hold_reason") or area.hold_reason
@@ -231,4 +234,4 @@ def search_items(q: str = "", limit: int = 25, db: Session = Depends(get_db), _:
     if text:
         like = f"%{text}%"
         stmt = stmt.where(func.lower(Item.name).like(like) | func.lower(func.coalesce(Item.sku, "")).like(like))
-    return [row(i) for i in db.scalars(stmt.order_by(Item.name).limit(min(limit, 100)))]
+    return [row(i) for i in db.scalars(stmt.order_by(Item.name).limit(max(1, min(limit, 100))))]

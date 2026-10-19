@@ -45,7 +45,7 @@ async def spa_fallback(request: Request, exc: HTTPException):
     """Unknown non-API paths get the app shell, so deep links work."""
     path = request.url.path
     dist = _dist()
-    if path.startswith("/api/") or dist is None or request.method != "GET":
+    if path == "/api" or path.startswith("/api/") or dist is None or request.method != "GET":
         detail = getattr(exc, "detail", "Not found.")
         return JSONResponse({"detail": detail}, status_code=404)
     return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})

@@ -9,6 +9,13 @@ from ..rules.constants import CLASSES, LEAD_SOURCES, PROJECT_TYPES, ROLE_CAPS, S
 from ..timeutil import now
 
 
+def refuse_nulls(data: dict, *keys: str) -> None:
+    """A PATCH may leave a field out, but may not blank a field that must have a value."""
+    for key in keys:
+        if key in data and data[key] is None:
+            raise HTTPException(422, f"{key.replace('_', ' ').capitalize()} can't be empty.")
+
+
 def get_job(db: Session, job_id: int) -> Job:
     job = db.get(Job, job_id)
     if job is None:

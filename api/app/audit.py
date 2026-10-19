@@ -17,6 +17,7 @@ from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session
 
 from .models import AuditLog, Base
+from .timeutil import TZ
 
 _SKIP_FIELDS = {"name_norm", "phone_norm", "email_norm", "created_at", "synced_at"}
 
@@ -120,7 +121,12 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
 
     if table == "scheduled_visits":
         when = g("starts_at")
-        when_txt = when.strftime("%b %-d, %-I:%M %p") if isinstance(when, datetime) else str(when)
+        if isinstance(when, datetime):
+            local = when.astimezone(TZ) if when.tzinfo else when
+            hour = local.hour % 12 or 12
+            when_txt = f"{local:%b} {local.day}, {hour}:{local:%M} {'AM' if local.hour < 12 else 'PM'}"
+        else:
+            when_txt = str(when)
         if action == "insert":
             return f"{'Site' if g('kind') == 'site' else 'Showroom'} visit scheduled for {when_txt}"
         if changed("status"):

@@ -141,3 +141,28 @@ def test_everything_tab_has_more_than_the_story(jay):
     edit = [e for e in everything if e["table_name"] == "jobs" and "lead_source" in e["changes"]][0]
     assert edit["changes"]["lead_source"] == [None, "designer"]
     assert edit["user_id"] == jay.id
+
+
+def test_the_same_person_twice_on_an_event_is_fine(jay):
+    from conftest import new_entity
+
+    kisch = new_entity(jay, "Pinches Kisch")
+    job = new_job(jay, people=[{"entity_id": kisch["id"], "role": "owner"}, {"entity_id": kisch["id"], "role": "pm"}],
+                  first_event={"kind": "contact", "summary": "Called"})
+    r = jay.post(
+        f"/api/jobs/{job['id']}/events",
+        json={"kind": "contact", "summary": "Again", "people": [kisch["id"], kisch["id"]], "next_step": step(jay.id)},
+    )
+    assert r.status_code == 201
+
+
+def test_visit_story_line_is_in_new_york_time(jay):
+    job = new_job(jay)
+    jay.post(f"/api/jobs/{job['id']}/visits", json={"kind": "showroom", "starts_at": "2031-06-02T18:30:00+00:00"})
+    story = [e["summary"] for e in jay.get(f"/api/jobs/{job['id']}/timeline").json()]
+    assert "Showroom visit scheduled for Jun 2, 2:30 PM" in story
+
+
+def test_unknown_api_path_is_a_json_404(client):
+    r = client.get("/api/nope")
+    assert r.status_code == 404 and r.json()["detail"]

@@ -32,6 +32,8 @@ def log_event(job_id: int, body: EventCreate, db: Session = Depends(get_db), use
     """Log a call, a visit, a site visit. Every one ends with a next step."""
     job = get_job(db, job_id)
     _check_showroom(body.showroom)
+    if body.occurred_at is not None and body.occurred_at.tzinfo is None:
+        raise HTTPException(422, "The time must include a time zone.")
 
     visit = None
     if body.scheduled_visit_id is not None:
@@ -59,8 +61,8 @@ def log_event(job_id: int, body: EventCreate, db: Session = Depends(get_db), use
     )
     db.add(ev)
     db.flush()
-    for eid in dict.fromkeys(body.people):
-        db.add(EventPerson(event_id=ev.id, entity_id=live_entity(db, eid).id))
+    for eid in {live_entity(db, i).id for i in body.people}:
+        db.add(EventPerson(event_id=ev.id, entity_id=eid))
 
     if visit is not None:
         visit.status, visit.resolved_at, visit.resolved_by = "happened", now(), user.id

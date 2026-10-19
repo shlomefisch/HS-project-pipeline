@@ -8,6 +8,7 @@ from ..models import Entity, Job, JobRole, User
 from ..rules.normalize import norm_name, norm_phone
 from ..schemas import EntityCheck, EntityCreate, EntityUpdate
 from ..serialize import entity_out, row
+from ..services.jobs import refuse_nulls
 from ..services.people import apply_norms, find_matches, merge
 
 router = APIRouter(prefix="/entities", tags=["people"])
@@ -37,7 +38,7 @@ def search_entities(q: str = "", limit: int = 30, db: Session = Depends(get_db),
             stmt = stmt.order_by(func.similarity(Entity.name_norm, n).desc())
     else:
         stmt = stmt.order_by(Entity.created_at.desc())
-    return [entity_out(e) for e in db.scalars(stmt.limit(min(limit, 100)))]
+    return [entity_out(e) for e in db.scalars(stmt.limit(max(1, min(limit, 100))))]
 
 
 @router.post("/check")
@@ -99,6 +100,10 @@ def update_entity(entity_id: int, body: EntityUpdate, db: Session = Depends(get_
     data = body.model_dump(exclude_unset=True)
     if "name" in data and not data["name"]:
         raise HTTPException(422, "A name is required.")
+    refuse_nulls(data, "kind")
+    if data.get("company_id") is not None:
+        if data["company_id"] == ent.id or db.get(Entity, data["company_id"]) is None:
+            raise HTTPException(422, "That company doesn't exist.")
     for k, v in data.items():
         setattr(ent, k, v)
     apply_norms(ent)

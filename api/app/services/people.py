@@ -1,11 +1,12 @@
 """People and companies: duplicate matching and merging."""
 
 from fastapi import HTTPException
-from sqlalchemy import Float, func, literal, or_, select, update
+from sqlalchemy import Float, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from ..models import Entity, EventPerson, Job, JobRole
 from ..rules.normalize import norm_email, norm_name, norm_phone
+from ..timeutil import now
 
 # Tuned on real cases: "Pinchas Kish" vs "Pinches Kisch" scores 0.42,
 # unrelated names score under 0.2. Word similarity catches a short entry
@@ -90,8 +91,20 @@ def merge(db: Session, source: Entity, target: Entity) -> None:
     if target.merged_into_id:
         raise HTTPException(400, "The target was itself merged into another record — merge into that one.")
 
-    for role in db.scalars(select(JobRole).where(JobRole.entity_id == source.id)):
+    for role in db.scalars(select(JobRole).where(JobRole.entity_id == source.id)).all():
+        clash = role.active and db.scalar(
+            select(JobRole.id).where(
+                JobRole.job_id == role.job_id,
+                JobRole.entity_id == target.id,
+                JobRole.role == role.role,
+                JobRole.active.is_(True),
+            )
+        )
         role.entity_id = target.id
+        if clash:
+            # The real record already holds this role on the job: keep one, end the other.
+            role.active = False
+            role.ended_at = now()
     for job in db.scalars(select(Job).where(Job.default_contact_id == source.id)):
         job.default_contact_id = target.id
     for child in db.scalars(select(Entity).where(Entity.company_id == source.id)):
@@ -100,14 +113,11 @@ def merge(db: Session, source: Entity, target: Entity) -> None:
     # Event attendance: move, skipping events where the target is already listed.
     already = set(db.scalars(select(EventPerson.event_id).where(EventPerson.entity_id == target.id)))
     for ep in db.scalars(select(EventPerson).where(EventPerson.entity_id == source.id)).all():
-        if ep.event_id in already:
-            db.delete(ep)
-        else:
-            db.execute(
-                update(EventPerson)
-                .where(EventPerson.event_id == ep.event_id, EventPerson.entity_id == source.id)
-                .values(entity_id=target.id)
-            )
+        # Through the ORM, so the audit log records the move.
+        db.delete(ep)
+        if ep.event_id not in already:
+            db.add(EventPerson(event_id=ep.event_id, entity_id=target.id))
+            already.add(ep.event_id)
 
     # Fill gaps on the target from the duplicate.
     for field in ("phone", "email", "address", "netsuite_customer_id"):

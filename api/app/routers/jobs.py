@@ -98,7 +98,7 @@ def list_jobs(
     text = q.strip()
     if text:
         stmt = stmt.where(_matches(text))
-    stmt = stmt.order_by(Job.created_at.desc()).limit(min(limit, 300))
+    stmt = stmt.order_by(Job.created_at.desc()).limit(max(1, min(limit, 300)))
     return _summaries(db, list(db.scalars(stmt)))
 
 
@@ -144,8 +144,8 @@ def create_job(body: JobCreate, db: Session = Depends(get_db), user: User = Depe
         )
         db.add(ev)
         db.flush()
-        for p in body.people:
-            db.add(EventPerson(event_id=ev.id, entity_id=live_entity(db, p.entity_id).id))
+        for eid in {live_entity(db, p.entity_id).id for p in body.people}:
+            db.add(EventPerson(event_id=ev.id, entity_id=eid))
         event_id = ev.id
 
     create_task(db, job, body.next_step, user, source_event_id=event_id)

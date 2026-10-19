@@ -10,6 +10,7 @@ from ..models import Job, Task, User
 from ..rules.constants import CLASSES, SHOWROOMS
 from ..schemas import UserUpdate
 from ..serialize import user_out
+from ..services.jobs import refuse_nulls
 from ..timeutil import now
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -47,6 +48,7 @@ def update_user(user_id: int, body: UserUpdate, db: Session = Depends(get_db), m
     if target is None:
         raise HTTPException(404, "User not found.")
     data = body.model_dump(exclude_unset=True)
+    refuse_nulls(data, "name", "role", "is_admin", "active")
     if "home_showroom" in data and data["home_showroom"] not in (None, *SHOWROOMS):
         raise HTTPException(422, "Unknown showroom.")
     if "default_class" in data and data["default_class"] not in (None, *CLASSES):
