@@ -168,7 +168,8 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .status-lost, .status-stuck { background: var(--oxide-soft); color: var(--oxide); }
 .status-closed { background: var(--glaze-soft); color: var(--glaze); }
 .job-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 16px; }
-.tabs { display: flex; border-bottom: 2px solid var(--grout); margin-bottom: 8px; overflow-x: auto; }
+.tabs { display: flex; border-bottom: 2px solid var(--grout); margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
 .tabs button {
   border: 0; background: transparent; padding: 12px 14px; min-height: 48px; cursor: pointer;
   font-weight: 600; color: var(--stone); border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap;
