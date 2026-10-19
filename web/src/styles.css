@@ -269,3 +269,6 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .toast-error { background: var(--oxide); }
 
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* Team screen: NetSuite sync history */
+.sync-runs li { padding: 10px 2px; font-size: 0.92rem; }

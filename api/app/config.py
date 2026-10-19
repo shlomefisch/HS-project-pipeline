@@ -39,5 +39,18 @@ class Settings:
     token_days: int = field(default_factory=lambda: int(os.environ.get("TOKEN_DAYS", "30")))
     web_dist: str = field(default_factory=lambda: os.environ.get("WEB_DIST", ""))
 
+    # NetSuite token-based auth, read-only use (SuiteQL). All five, or the sync stays off.
+    ns_account: str = field(default_factory=lambda: os.environ.get("NS_ACCOUNT_ID", "").strip())
+    ns_consumer_key: str = field(default_factory=lambda: os.environ.get("NS_CONSUMER_KEY", "").strip())
+    ns_consumer_secret: str = field(default_factory=lambda: os.environ.get("NS_CONSUMER_SECRET", "").strip())
+    ns_token_id: str = field(default_factory=lambda: os.environ.get("NS_TOKEN_ID", "").strip())
+    ns_token_secret: str = field(default_factory=lambda: os.environ.get("NS_TOKEN_SECRET", "").strip())
+    # How often the item list refreshes. 0 turns the timer off (the Sync now button still works).
+    ns_sync_minutes: int = field(default_factory=lambda: int(os.environ.get("NS_SYNC_MINUTES", "60") or 0))
+
+    @property
+    def netsuite_configured(self) -> bool:
+        return all((self.ns_account, self.ns_consumer_key, self.ns_consumer_secret, self.ns_token_id, self.ns_token_secret))
+
 
 settings = Settings()

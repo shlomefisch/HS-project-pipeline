@@ -14,7 +14,9 @@ stalls because nobody knew it was their turn.
 - The rep's morning view: went wrong, today's visits, due now, stuck.
 - Every change to every table logged field by field. "The story" and "Everything" on each job.
 
-**Not yet:** the NetSuite sync and push, push notifications, templates, footage and availability, away/gone, offline queue.
+**NetSuite:** read-only item sync (inventory items, hourly, plus Sync now on the Team screen).
+
+**Not yet:** the NetSuite push and read-back, lot availability, push notifications, templates, footage and availability, away/gone, offline queue.
 The item list is a stand-in table until the sync exists.
 
 ## Layout
@@ -85,6 +87,14 @@ Migrations run on every start.
 Google Cloud Console → APIs & Services → Credentials → **Create credentials → OAuth client ID** → Web application.
 Add the Railway address (and `http://localhost:5173` for local) under **Authorized JavaScript origins**.
 Copy the client ID into `GOOGLE_CLIENT_ID`. With the OAuth consent screen set to **Internal**, only `@hstile.com` accounts can use it.
+
+### NetSuite item sync
+
+Read-only. Uses SuiteQL with token-based auth: the existing integration's consumer key and secret, plus an access token made for this app.
+Set `NS_ACCOUNT_ID`, `NS_CONSUMER_KEY`, `NS_CONSUMER_SECRET`, `NS_TOKEN_ID`, `NS_TOKEN_SECRET` on Railway (never in the repo).
+The token's role needs **REST Web Services** and **SuiteAnalytics Workbook**, plus view access to items.
+The first run is a full copy, about a minute after start; then changes every `NS_SYNC_MINUTES` (default 60), and a full copy again once a day.
+Status and a **Sync now** button are on the Team screen.
 
 ### Phones
 

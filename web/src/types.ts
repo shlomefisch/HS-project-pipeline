@@ -67,6 +67,26 @@ export interface Item {
   sku: string | null;
   size: string | null;
   finish: string | null;
+  is_lot?: boolean;
+}
+
+export interface SyncRun {
+  id: number;
+  mode: "full" | "changes";
+  started_at: string;
+  finished_at: string | null;
+  status: "running" | "ok" | "failed";
+  rows_seen: number;
+  error: string | null;
+}
+
+export interface ItemSyncStatus {
+  configured: boolean;
+  every_minutes: number;
+  items_active: number;
+  items_total: number;
+  running: boolean;
+  runs: SyncRun[];
 }
 
 export interface Candidate {

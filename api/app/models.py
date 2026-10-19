@@ -113,7 +113,23 @@ class Item(Base):
     finish: Mapped[str | None] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_lot: Mapped[bool] = mapped_column(Boolean, default=False)
     synced_at: Mapped[datetime] = _now()
+
+
+class SyncRun(Base):
+    """One NetSuite sync attempt. Written with plain SQL, outside the audit log."""
+
+    __tablename__ = "sync_runs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(Text)
+    mode: Mapped[str] = mapped_column(Text)
+    started_at: Mapped[datetime] = _now()
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(Text, default="running")
+    rows_seen: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+    started_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class Candidate(Base):
