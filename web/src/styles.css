@@ -206,6 +206,8 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .tag-declined .tile-name { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--stone); font-weight: 500; }
 .tag-chosen { box-shadow: inset 4px 0 0 var(--glaze); padding-left: 12px; }
 .tag-chosen .tile-meta { color: var(--glaze); }
+.no-match { padding: 12px; border: 1px dashed var(--grout-dark); border-radius: var(--radius-small); margin: 10px 0; }
+.no-match p { margin-bottom: 8px; }
 .picked { display: flex; flex-direction: column; gap: 4px; padding: 12px; background: var(--glaze-soft); border-radius: var(--radius-small); margin: 10px 0; }
 
 /* -------------------------------------------------------------- sheet */

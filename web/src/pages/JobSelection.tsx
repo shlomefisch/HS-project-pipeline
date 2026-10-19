@@ -149,6 +149,8 @@ export function AddTile({ job, onClose, onDone, scanned }: { job: Job; onClose: 
   const [item, setItem] = useState<{ id: number; name: string } | null>(scanned ? { id: scanned.id, name: scanned.item?.name ?? `Item #${scanned.id}` } : null);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Item[]>([]);
+  const [searchedFor, setSearchedFor] = useState("");
+  const [itemNo, setItemNo] = useState("");
   const [name, setName] = useState("");
   const [supplier, setSupplier] = useState("");
   const [weeks, setWeeks] = useState("");
@@ -156,8 +158,22 @@ export function AddTile({ job, onClose, onDone, scanned }: { job: Job; onClose: 
   const { busy, error, run } = useAction();
 
   useEffect(() => {
-    if (source !== "stock" || !q.trim()) return setResults([]);
-    const t = window.setTimeout(() => api.get<Item[]>("/items", { q }).then(setResults).catch(() => {}), 200);
+    if (source !== "stock" || !q.trim()) {
+      setResults([]);
+      setSearchedFor("");
+      return;
+    }
+    const t = window.setTimeout(
+      () =>
+        api
+          .get<Item[]>("/items", { q })
+          .then((r) => {
+            setResults(r);
+            setSearchedFor(q);
+          })
+          .catch(() => {}),
+      200,
+    );
     return () => window.clearTimeout(t);
   }, [q, source]);
 
@@ -198,7 +214,22 @@ export function AddTile({ job, onClose, onDone, scanned }: { job: Job; onClose: 
                 </li>
               ))}
             </ul>
-            <p className="muted small">Faster: use Scan and point at the tag.</p>
+            {searchedFor.trim() && results.length === 0 && (
+              <div className="no-match">
+                <p>
+                  Nothing in the item list matches “{searchedFor.trim()}”. The list fills in from NetSuite once the sync is built.
+                  For now, enter the item's NetSuite number — the name fills in later, same as a scan.
+                </p>
+                <div className="inline">
+                  <input inputMode="numeric" value={itemNo} onChange={(e) => setItemNo(e.target.value.replace(/\D/g, ""))} placeholder="NetSuite item number" aria-label="NetSuite item number" />
+                  <button className="btn" disabled={!itemNo} onClick={() => setItem({ id: Number(itemNo), name: `Item #${itemNo} — ${searchedFor.trim()}` })}>
+                    Use it
+                  </button>
+                </div>
+                <p className="muted small">Or, if it isn't a stocking item, switch to Local supply above.</p>
+              </div>
+            )}
+            {!searchedFor.trim() && <p className="muted small">Faster: use Scan and point at the tag.</p>}
           </>
         )
       ) : (
@@ -218,6 +249,7 @@ export function AddTile({ job, onClose, onDone, scanned }: { job: Job; onClose: 
       )}
       <AreaPicker job={job} value={areas} onChange={setAreas} />
       <ErrorLine error={error} />
+      {!ready && <p className="muted small">{source === "stock" ? "Pick the item first — tap it in the list, or enter its number." : "Give the tile a name first."}</p>}
       <div className="actions">
         <button className="btn btn-quiet" onClick={onClose}>
           Cancel
@@ -230,7 +262,7 @@ export function AddTile({ job, onClose, onDone, scanned }: { job: Job; onClose: 
               await api.post(`/jobs/${job.id}/candidates`, {
                 source,
                 netsuite_item_id: source === "stock" && item ? item.id : null,
-                name: source === "stock" ? null : name,
+                name: source === "stock" ? (item && item.name.startsWith("Item #") ? item.name.replace(/^Item #\d+ — /, "") : null) : name,
                 supplier: source !== "stock" ? supplier || null : null,
                 lead_time_weeks: source === "overseas" && weeks ? Number(weeks) : null,
                 area_ids: areas,
