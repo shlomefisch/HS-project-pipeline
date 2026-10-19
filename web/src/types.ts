@@ -11,6 +11,9 @@ export interface User {
   home_showroom: string | null;
   default_class: string | null;
   active: boolean;
+  has_password?: boolean;
+  must_change_password?: boolean;
+  last_login_at?: string | null;
 }
 
 export interface Entity {

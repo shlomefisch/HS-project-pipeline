@@ -272,3 +272,17 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 
 /* Team screen: NetSuite sync history */
 .sync-runs li { padding: 10px 2px; font-size: 0.92rem; }
+
+/* Password sign-in */
+.pw-login { margin-top: 28px; }
+.btn-wide { width: 100%; justify-content: center; margin-top: 4px; }
+.login .btn-quiet { margin-top: 12px; }
+.page-foot { flex-wrap: wrap; gap: 6px; }
+.page-foot > span:first-child { margin-right: auto; }
+.inline-input { display: flex; gap: 8px; align-items: center; }
+.inline-input input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; letter-spacing: 0.04em; }
+.reset-box { margin: 12px 0; padding: 12px; border: 1px dashed var(--grout-dark); border-radius: var(--radius); }
+.handoff dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 12px 0; }
+.handoff dt { color: var(--stone); }
+.handoff dd { margin: 0; font-weight: 600; word-break: break-all; }
+.handoff .mono { font-family: ui-monospace, monospace; font-size: 1.15rem; letter-spacing: 0.06em; }

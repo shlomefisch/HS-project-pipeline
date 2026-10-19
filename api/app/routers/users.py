@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from ..auth import admin, member
+from ..auth import admin, member, set_password
 from ..db import get_db
 from ..models import Job, Task, User
 from ..rules.constants import CLASSES, SHOWROOMS
-from ..schemas import UserUpdate
+from ..passwords import problem_with
+from ..schemas import PasswordSet, UserCreate, UserUpdate
 from ..serialize import user_out
 from ..services.jobs import refuse_nulls
 from ..timeutil import now
@@ -22,6 +23,52 @@ def list_users(include_inactive: bool = False, db: Session = Depends(get_db), us
     if not include_inactive or not user.is_admin:
         stmt = stmt.where(User.active.is_(True))
     return [user_out(u) for u in db.scalars(stmt)]
+
+
+@router.post("", status_code=201)
+def create_user(body: UserCreate, db: Session = Depends(get_db), _: User = Depends(admin)):
+    """An admin adds a person with a temporary password; they pick their own on first sign-in."""
+    email = (body.email or "").lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(422, "That doesn't look like an email address.")
+    if db.scalar(select(User.id).where(User.email == email)):
+        raise HTTPException(409, "Someone with that email is already on the team.")
+    if body.home_showroom not in (None, *SHOWROOMS):
+        raise HTTPException(422, "Unknown showroom.")
+    if body.default_class not in (None, *CLASSES):
+        raise HTTPException(422, "Unknown class.")
+    problem = problem_with(body.password)
+    if problem:
+        raise HTTPException(422, problem)
+    user = User(
+        email=email,
+        name=body.name,
+        role=body.role,
+        is_admin=body.is_admin,
+        home_showroom=body.home_showroom,
+        default_class=body.default_class,
+        active=True,
+    )
+    set_password(user, body.password, must_change=True)
+    db.add(user)
+    db.commit()
+    return user_out(user)
+
+
+@router.post("/{user_id}/password")
+def reset_password(user_id: int, body: PasswordSet, db: Session = Depends(get_db), me: User = Depends(admin)):
+    """Forgotten password: the admin sets a temporary one. Their old sessions end."""
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(404, "User not found.")
+    if target.id == me.id:
+        raise HTTPException(422, "Change your own password from the Today screen (bottom of the page).")
+    problem = problem_with(body.password)
+    if problem:
+        raise HTTPException(422, problem)
+    set_password(target, body.password, must_change=True)
+    db.commit()
+    return user_out(target)
 
 
 @router.get("/assignee-suggestions")

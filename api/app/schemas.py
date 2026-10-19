@@ -28,7 +28,33 @@ class DevSignIn(_In):
     name: str | None = None
 
 
+class PasswordSignIn(_In):
+    email: str
+    password: str
+
+
+class PasswordChange(_In):
+    current_password: str
+    new_password: str
+
+
+class PasswordSet(_In):
+    password: str
+
+
 # --------------------------------------------------------------- users
+class UserCreate(_In):
+    email: str
+    name: str
+    role: Literal["rep", "back_office", "management", "viewer"]
+    is_admin: bool = False
+    home_showroom: str | None = None
+    default_class: str | None = None
+    password: str
+
+    _s = field_validator("email", "name", "home_showroom", "default_class", mode="before")(_strip)
+
+
 class UserUpdate(_In):
     name: str | None = None
     role: Literal["pending", "rep", "back_office", "management", "viewer"] | None = None

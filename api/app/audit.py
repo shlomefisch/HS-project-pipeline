@@ -19,7 +19,11 @@ from sqlalchemy.orm import Session
 from .models import AuditLog, Base
 from .timeutil import TZ
 
-_SKIP_FIELDS = {"name_norm", "phone_norm", "email_norm", "created_at", "synced_at"}
+_SKIP_FIELDS = {
+    "name_norm", "phone_norm", "email_norm", "created_at", "synced_at",
+    # Sign-in bookkeeping: never in the history, and the hash above all.
+    "password_hash", "failed_logins", "locked_until", "last_login_at",
+}
 
 
 def _plain(value: Any) -> Any:

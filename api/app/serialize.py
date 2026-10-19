@@ -38,6 +38,9 @@ def user_out(u) -> dict | None:
         "home_showroom": u.home_showroom,
         "default_class": u.default_class,
         "active": u.active,
+        "has_password": bool(u.password_hash),
+        "must_change_password": bool(u.must_change_password),
+        "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
     }
 
 

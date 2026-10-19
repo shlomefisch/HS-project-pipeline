@@ -1,6 +1,7 @@
 """Sign-in and who-may-do-what.
 
-Google proves who someone is (only @hstile.com accounts get in).
+People sign in with the email and password an admin set for them
+(Google sign-in also works if GOOGLE_CLIENT_ID is set).
 What they may do lives here: role, admin flag, active.
 """
 
@@ -14,13 +15,64 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .db import get_db
 from .models import User
+from .passwords import hash_password, verify_password
 from .rules.constants import WRITER_ROLES
+
+MAX_MISSES = 8
+LOCK_FOR = timedelta(minutes=15)
+_DUMMY_HASH = hash_password("timing-equalizer")
+
+
+def _password_version(user: User) -> int:
+    # Changing or resetting a password bumps this, which ends every older session.
+    return int(user.password_changed_at.timestamp()) if user.password_changed_at else 0
 
 
 def issue_token(user: User) -> str:
     now = datetime.now(timezone.utc)
-    payload = {"sub": str(user.id), "iat": now, "exp": now + timedelta(days=settings.token_days)}
+    payload = {
+        "sub": str(user.id),
+        "pv": _password_version(user),
+        "iat": now,
+        "exp": now + timedelta(days=settings.token_days),
+    }
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+def password_sign_in(db: Session, email: str, password: str) -> User:
+    """Email + password. One vague answer for every miss, so it can't be used to find accounts."""
+    wrong = HTTPException(400, "That email and password don't match.")
+    user = db.scalar(select(User).where(User.email == email.lower().strip()))
+    now = datetime.now(timezone.utc)
+    if user is None or not user.password_hash:
+        verify_password(password, _DUMMY_HASH)  # same work either way
+        raise wrong
+    if user.locked_until and user.locked_until > now:
+        minutes = max(1, int((user.locked_until - now).total_seconds() // 60) + 1)
+        raise HTTPException(429, f"Too many wrong tries. Try again in {minutes} minute(s), or ask an admin to reset the password.")
+    db.info["user_id"] = user.id
+    if not verify_password(password, user.password_hash):
+        user.failed_logins = (user.failed_logins or 0) + 1
+        if user.failed_logins >= MAX_MISSES:
+            user.locked_until = now + LOCK_FOR
+            user.failed_logins = 0
+        db.commit()
+        raise wrong
+    if not user.active:
+        raise HTTPException(403, "This account has been deactivated.")
+    user.failed_logins = 0
+    user.locked_until = None
+    user.last_login_at = now
+    db.commit()
+    return user
+
+
+def set_password(user: User, password: str, *, must_change: bool) -> None:
+    user.password_hash = hash_password(password)
+    user.password_changed_at = datetime.now(timezone.utc)
+    user.must_change_password = must_change
+    user.failed_logins = 0
+    user.locked_until = None
 
 
 def verify_google_credential(credential: str) -> dict:
@@ -82,6 +134,8 @@ def current_user(authorization: str | None = Header(default=None), db: Session =
     user = db.get(User, user_id)
     if user is None or not user.active:
         raise HTTPException(401, "This account is not active.")
+    if payload.get("pv", 0) != _password_version(user):
+        raise HTTPException(401, "Your password was changed — sign in again.")
     # The audit log reads this to know who made every change in this request.
     db.info["user_id"] = user.id
     return user

@@ -5,7 +5,7 @@ import { api, getToken, setToken, setUnauthorizedHandler } from "./api";
 import { AppProvider, useApp, useRoute } from "./state";
 import { Loading } from "./ui";
 import type { Meta, User } from "./types";
-import { Login, Pending } from "./pages/Login";
+import { Login, MustChangePassword, Pending } from "./pages/Login";
 import { Today } from "./pages/Today";
 import { Jobs, NewJob } from "./pages/Jobs";
 import { JobPage } from "./pages/Job";
@@ -43,12 +43,13 @@ function Root() {
 
   if (me === undefined) return <Loading />;
   if (me === null) return <Login onSignedIn={setMe} />;
+  if (me.must_change_password) return <MustChangePassword me={me} onDone={setMe} onSignOut={signOut} />;
   if (me.role === "pending" && !me.is_admin) return <Pending user={me} onSignOut={signOut} />;
   if (!meta) return <Loading />;
 
   return (
     <AppProvider me={me} meta={meta} toast={toast}>
-      <Shell onSignOut={signOut} />
+      <Shell onSignOut={signOut} onMe={setMe} />
       {toastMsg && (
         <div className={`toast toast-${toastMsg.kind}`} role="status">
           {toastMsg.text}
@@ -58,7 +59,7 @@ function Root() {
   );
 }
 
-function Shell({ onSignOut }: { onSignOut: () => void }) {
+function Shell({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: User) => void }) {
   const { me } = useApp();
   const route = useRoute();
   const [section, a, b] = route;
@@ -71,7 +72,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   else if (section === "people" && a) page = <PersonPage id={Number(a)} key={a} />;
   else if (section === "people") page = <People />;
   else if (section === "team" && me.is_admin) page = <Admin />;
-  else page = <Today onSignOut={onSignOut} />;
+  else page = <Today onSignOut={onSignOut} onMe={onMe} />;
   void b;
 
   const tab = (key: string, label: string) => (

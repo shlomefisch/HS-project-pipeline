@@ -13,6 +13,7 @@ def public_config():
         "google_client_id": settings.google_client_id,
         "allowed_domain": settings.allowed_domain,
         "dev_login": settings.dev_login,
+        "password_login": True,
     }
 
 

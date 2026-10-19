@@ -2,7 +2,8 @@ import { useState } from "react";
 import { api } from "../api";
 import { go, niceDate, niceTime, useApp, useLoad } from "../state";
 import { Empty, Loading } from "../ui";
-import type { Job, Task, Visit } from "../types";
+import type { Job, Task, User, Visit } from "../types";
+import { ChangePasswordSheet } from "./Login";
 import { CompleteTask } from "./TaskActions";
 
 interface RepView {
@@ -19,8 +20,9 @@ interface OfficeView {
   counts: { tasks: number; overdue: number };
 }
 
-export function Today({ onSignOut }: { onSignOut: () => void }) {
-  const { me } = useApp();
+export function Today({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: User) => void }) {
+  const { me, toast } = useApp();
+  const [pwOpen, setPwOpen] = useState(false);
   const [view, setView] = useState<"rep" | "office">(me.role === "rep" ? "rep" : "office");
   return (
     <main className="page">
@@ -38,10 +40,24 @@ export function Today({ onSignOut }: { onSignOut: () => void }) {
       {view === "rep" ? <RepDashboard /> : <OfficeDashboard />}
       <footer className="page-foot">
         <span className="muted small">{me.email}</span>
+        <button className="btn btn-small btn-quiet" onClick={() => setPwOpen(true)}>
+          {me.has_password === false ? "Set password" : "Change password"}
+        </button>
         <button className="btn btn-small btn-quiet" onClick={onSignOut}>
           Sign out
         </button>
       </footer>
+      {pwOpen && (
+        <ChangePasswordSheet
+          me={me}
+          onClose={() => setPwOpen(false)}
+          onDone={(u) => {
+            setPwOpen(false);
+            onMe(u);
+            toast("Password saved.");
+          }}
+        />
+      )}
     </main>
   );
 }

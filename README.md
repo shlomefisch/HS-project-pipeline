@@ -82,7 +82,13 @@ Each run creates and drops its own throwaway database. GitHub runs the same test
 
 Migrations run on every start.
 
-### Google sign-in
+### Sign-in
+
+People sign in with email and password. An admin adds each person on the Team screen with a temporary password, and they pick their own on first sign-in.
+Forgotten password: open the person on the Team screen → Reset password. Eight wrong tries lock an account for 15 minutes.
+First setup: while `DEV_LOGIN=1`, sign in with Test sign-in, set your own password (Today → bottom of the page), sign out, sign in with it, then set `DEV_LOGIN=0`.
+
+### Google sign-in (optional)
 
 Google Cloud Console → APIs & Services → Credentials → **Create credentials → OAuth client ID** → Web application.
 Add the Railway address (and `http://localhost:5173` for local) under **Authorized JavaScript origins**.
