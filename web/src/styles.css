@@ -347,3 +347,9 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .link-btn { background: none; border: 0; padding: 0; text-align: left; color: var(--slate); font: inherit; cursor: pointer; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .covering { font-size: 0.8rem; color: var(--ochre); font-weight: 600; }
+
+/* Notifications */
+.notify-box { margin-top: 28px; padding: 12px; border: 1px solid var(--grout); border-radius: var(--radius); background: var(--surface); }
+.notify-box p { margin: 0 0 8px; }
+.notify-on { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.notify-on span { margin-right: auto; }

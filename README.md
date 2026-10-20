@@ -20,7 +20,9 @@ stalls because nobody knew it was their turn.
 
 **Away or gone** (Team → person → Away or gone…): away = dates and a cover; everything they hold (jobs, open tasks, upcoming visits, the takeoff slot) and anything new goes to the cover, marked "covering for"; on return open work goes back by itself, finished work stays credited to the cover. Gone = hand over in bulk or one by one; deactivate is locked until every count is zero.
 
-**Not yet:** the NetSuite push and read-back,  push notifications, templates, footage and availability, offline queue.
+**Phone notifications** (Today → Turn on notifications): a step given to you by someone else (notify / interrupt severity), a bad answer or block on your job, and anything logged on your job by someone else. Interrupt stays on screen until tapped. Filtered phones need fcm.googleapis.com whitelisted.
+
+**Not yet:** the NetSuite push and read-back,  templates, footage and availability, offline queue.
 The item list is a stand-in table until the sync exists.
 
 ## Layout

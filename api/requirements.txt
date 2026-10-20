@@ -9,3 +9,4 @@ google-auth>=2.29,<3
 requests>=2.31,<3
 tzdata>=2024.1
 python-multipart>=0.0.9,<1
+pywebpush>=2.0,<3

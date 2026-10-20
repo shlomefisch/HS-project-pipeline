@@ -12,6 +12,7 @@ import { JobPage } from "./pages/Job";
 import { Scan } from "./pages/Scan";
 import { People, PersonPage } from "./pages/People";
 import { Admin } from "./pages/Admin";
+import { forgetThisPhone } from "./notify";
 import { AwayOrGone } from "./pages/AwayOrGone";
 
 function Root() {
@@ -20,8 +21,11 @@ function Root() {
   const [toastMsg, setToastMsg] = useState<{ text: string; kind: string } | null>(null);
 
   const signOut = useCallback(() => {
-    setToken(null);
-    setMe(null);
+    // Forget this phone first (needs the session), then sign out.
+    forgetThisPhone().finally(() => {
+      setToken(null);
+      setMe(null);
+    });
   }, []);
 
   useEffect(() => {

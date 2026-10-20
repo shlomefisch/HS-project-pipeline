@@ -4,6 +4,7 @@ import { go, niceDate, niceTime, useApp, useLoad } from "../state";
 import { Empty, Loading } from "../ui";
 import type { Job, Task, User, Visit } from "../types";
 import { ChangePasswordSheet } from "./Login";
+import { NotificationsBox } from "../notify";
 import { CompleteTask } from "./TaskActions";
 
 interface RepView {
@@ -38,6 +39,7 @@ export function Today({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: Us
         </div>
       </header>
       {view === "rep" ? <RepDashboard /> : <OfficeDashboard />}
+      <NotificationsBox />
       <footer className="page-foot">
         <span className="muted small">{me.email}</span>
         <button className="btn btn-small btn-quiet" onClick={() => setPwOpen(true)}>

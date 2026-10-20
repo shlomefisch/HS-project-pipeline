@@ -14,9 +14,10 @@ from starlette.requests import Request
 
 from . import audit  # noqa: F401  — registers the audit hook on every session
 from . import scheduler
+from .services import push as _push  # noqa: F401  — registers the notification hooks
 from .config import settings
 from .db import engine
-from .routers import auth, dashboard, entities, estimates, jobs, meta, plans, selection, sync, tasks, team, timeline, users
+from .routers import auth, dashboard, entities, estimates, jobs, meta, plans, push, selection, sync, tasks, team, timeline, users
 
 
 
@@ -29,7 +30,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Project Pipeline", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=lifespan)
 
-for r in (meta, auth, users, entities, jobs, selection, plans, estimates, timeline, tasks, dashboard, sync, team):
+for r in (meta, auth, users, entities, jobs, selection, plans, estimates, timeline, tasks, dashboard, sync, team, push):
     app.include_router(r.router, prefix="/api")
 
 
