@@ -75,6 +75,9 @@ def create(db: Session, job: Job, area_ids: list[int], note: str | None, by: Use
             description=f"{name} — {area.name}", quantity=qty, unit=unit, base_price=base, price=base, sort_order=i,
         ))
     db.flush()
+    from .templates import apply
+
+    apply(db, job, "estimate_started", by)
     return est
 
 

@@ -22,7 +22,9 @@ stalls because nobody knew it was their turn.
 
 **Phone notifications** (Today → Turn on notifications): a step given to you by someone else (notify / interrupt severity), a bad answer or block on your job, and anything logged on your job by someone else. Interrupt stays on screen until tapped. Filtered phones need fcm.googleapis.com whitelisted.
 
-**Not yet:** the NetSuite push and read-back,  templates, footage and availability, offline queue.
+**Step templates** (Team → Step templates): steps a job gets by itself when it's created, when the takeoff is done, when an estimate is started, and when an area is decided — each with who (rep / takeoff person / whoever did it / a named person), due-in days, severity, and which playbook. Empty until filled.
+
+**Not yet:** the NetSuite push and read-back,  footage and availability, offline queue.
 The item list is a stand-in table until the sync exists.
 
 ## Layout

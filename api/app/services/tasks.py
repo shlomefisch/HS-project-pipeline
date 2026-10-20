@@ -107,6 +107,9 @@ def complete(db: Session, task: Task, outcome: str, note: str | None, step: Next
     task.completed_by = by.id
     task.needs_rep_attention = outcome == "bad_answer" and not is_rep
 
-    if step is not None:
-        return create_task(db, job, step, by, parent_task_id=task.id)
-    return None
+    follow_up = create_task(db, job, step, by, parent_task_id=task.id) if step is not None else None
+    if task.kind == "takeoff" and outcome == "done":
+        from .templates import apply
+
+        apply(db, job, "takeoff_done", by)
+    return follow_up

@@ -302,6 +302,7 @@ function Defaults({ people }: { people: User[] }) {
         </select>
       </Field>
       <ErrorLine error={saveError} />
+      <button className="btn" onClick={() => go("/team/templates")}>Step templates — the steps jobs get by themselves</button>
     </section>
   );
 }

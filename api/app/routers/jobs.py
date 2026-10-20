@@ -152,6 +152,9 @@ def create_job(body: JobCreate, db: Session = Depends(get_db), user: User = Depe
         event_id = ev.id
 
     create_task(db, job, body.next_step, user, source_event_id=event_id)
+    from ..services.templates import apply
+
+    apply(db, job, "job_created", user)
     db.commit()
     return job_detail(db, job)
 

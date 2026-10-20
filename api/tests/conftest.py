@@ -61,7 +61,7 @@ def database():
 
 
 TABLES = [
-    "push_subscriptions", "absences", "estimate_lines", "estimate_areas", "estimates", "file_blobs", "job_files", "app_settings", "sync_runs", "audit_log", "tasks", "event_people", "events", "scheduled_visits", "samples", "candidate_tags",
+    "push_subscriptions", "step_templates", "absences", "estimate_lines", "estimate_areas", "estimates", "file_blobs", "job_files", "app_settings", "sync_runs", "audit_log", "tasks", "event_people", "events", "scheduled_visits", "samples", "candidate_tags",
     "candidates", "items", "areas", "job_roles", "jobs", "entities", "users",
 ]
 

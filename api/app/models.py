@@ -262,6 +262,24 @@ class Task(Base):
     completed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     kind: Mapped[str | None] = mapped_column(Text)  # "takeoff", or None for an ordinary step
     covering_for_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    template_step_id: Mapped[int | None] = mapped_column(ForeignKey("step_templates.id"))
+
+
+class StepTemplate(Base):
+    __tablename__ = "step_templates"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    trigger: Mapped[str] = mapped_column(Text)
+    playbook: Mapped[str] = mapped_column(Text, default="all")
+    title: Mapped[str] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    assignee_kind: Mapped[str] = mapped_column(Text, default="rep")
+    assignee_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    due_days: Mapped[int] = mapped_column(Integer, default=1)
+    severity: Mapped[str] = mapped_column(Text, default="silent")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = _now()
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class Absence(Base):

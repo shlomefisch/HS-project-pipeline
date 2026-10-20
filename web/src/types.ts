@@ -327,3 +327,24 @@ export interface AwayOrGone {
   history: Absence[];
   covering_for: number[];
 }
+
+export interface StepTemplate {
+  id: number;
+  trigger: "job_created" | "takeoff_done" | "estimate_started" | "area_decided";
+  playbook: "all" | "single_family" | "projects";
+  title: string;
+  notes: string | null;
+  assignee_kind: "rep" | "takeoff" | "actor" | "user";
+  assignee_user_id: number | null;
+  due_days: number;
+  severity: "silent" | "notify" | "interrupt";
+  sort_order: number;
+  active: boolean;
+}
+
+export interface TemplateList {
+  steps: StepTemplate[];
+  triggers: Record<string, string>;
+  playbooks: Record<string, string>;
+  assignee_kinds: Record<string, string>;
+}

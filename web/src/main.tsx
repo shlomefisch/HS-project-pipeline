@@ -14,6 +14,7 @@ import { People, PersonPage } from "./pages/People";
 import { Admin } from "./pages/Admin";
 import { forgetThisPhone } from "./notify";
 import { AwayOrGone } from "./pages/AwayOrGone";
+import { Templates } from "./pages/Templates";
 
 function Root() {
   const [me, setMe] = useState<User | null | undefined>(undefined);
@@ -79,6 +80,7 @@ function Shell({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: User) => 
   else if (section === "scan") page = <Scan jobId={a ? Number(a) : null} key={a ?? "scan"} />;
   else if (section === "people" && a) page = <PersonPage id={Number(a)} key={a} />;
   else if (section === "people") page = <People />;
+  else if (section === "team" && me.is_admin && a === "templates") page = <Templates />;
   else if (section === "team" && me.is_admin && a) page = <AwayOrGone id={Number(a)} key={a} />;
   else if (section === "team" && me.is_admin) page = <Admin />;
   else page = <Today onSignOut={onSignOut} onMe={onMe} />;

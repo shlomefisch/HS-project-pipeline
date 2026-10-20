@@ -50,7 +50,7 @@ def create_area(job_id: int, body: AreaCreate, db: Session = Depends(get_db), us
 
 
 @router.patch("/areas/{area_id}")
-def update_area(area_id: int, body: AreaUpdate, db: Session = Depends(get_db), _: User = Depends(writer)):
+def update_area(area_id: int, body: AreaUpdate, db: Session = Depends(get_db), user: User = Depends(writer)):
     area = db.get(Area, area_id)
     if area is None:
         raise HTTPException(404, "Area not found.")
@@ -76,8 +76,14 @@ def update_area(area_id: int, body: AreaUpdate, db: Session = Depends(get_db), _
         )
         if not chosen:
             raise HTTPException(422, f"Choose at least one tile for {area.name} before marking it decided.")
+    newly_decided = status == "decided" and area.status != "decided"
     for k, v in data.items():
         setattr(area, k, v)
+    if newly_decided:
+        from ..models import Job
+        from ..services.templates import apply
+
+        apply(db, db.get(Job, area.job_id), "area_decided", user, area=area)
     try:
         db.commit()
     except IntegrityError as exc:
