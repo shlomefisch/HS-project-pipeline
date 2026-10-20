@@ -104,6 +104,9 @@ export interface ItemSyncStatus {
   items_total: number;
   items_stock: number;
   items_with_unit: number;
+  photos_known?: number;
+  photos_linked?: number;
+  photo_sample?: string | null;
   running: boolean;
   runs: SyncRun[];
 }

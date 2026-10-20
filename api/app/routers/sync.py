@@ -27,6 +27,9 @@ def item_sync_status(db: Session = Depends(get_db), _: User = Depends(admin)):
         "items_with_unit": db.scalar(
             select(func.count()).select_from(Item).where(Item.active.is_(True), Item.is_stock.is_(True), Item.unit.is_not(None))
         ),
+        "photos_known": db.scalar(select(func.count()).select_from(Item).where(Item.is_stock.is_(True), Item.active.is_(True), Item.image_file_id.is_not(None))),
+        "photos_linked": db.scalar(select(func.count()).select_from(Item).where(Item.is_stock.is_(True), Item.active.is_(True), Item.image_url.is_not(None))),
+        "photo_sample": db.scalar(select(Item.image_url).where(Item.image_url.is_not(None)).limit(1)),
         "running": any(r.status == "running" for r in runs[:1]),
         "runs": [row(r) for r in runs],
     }

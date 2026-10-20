@@ -135,6 +135,10 @@ function ItemSync() {
             {" "}Refreshes from NetSuite {data.every_minutes > 0 ? `every ${data.every_minutes} minutes` : "only when you press Sync now"}. Read-only — nothing is sent to NetSuite.
           </p>
           {last?.status === "failed" && <p className="error-line" role="alert">Last sync failed: {last.error}</p>}
+          <p className="muted small">
+            Photos: {(data.photos_known ?? 0).toLocaleString()} stocking items have a photo in NetSuite, {(data.photos_linked ?? 0).toLocaleString()} with an address the app can use.
+            {data.photo_sample && <> Sample: <a href={data.photo_sample} target="_blank" rel="noopener">open one</a>.</>}
+          </p>
           <ul className="list sync-runs">
             {data.runs.map((r) => (
               <li key={r.id} className="muted">{runLine(r)}</li>
