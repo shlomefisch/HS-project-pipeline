@@ -700,3 +700,10 @@ body:has(.login) { background: radial-gradient(120% 90% at 20% 0%, #24486a 0%, v
 .tile-number-box { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--stone); }
 .tile-number-box input { width: 7.5em; text-align: right; font-weight: 600; font-size: 1rem; padding: 8px 10px; }
 .tile-number-empty input { border-color: var(--oxide); background: var(--oxide-soft); }
+
+/* ---- samples on the tile */
+.sample-pill { display: inline-block; margin-top: 3px; font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--sand-soft); color: var(--sand-dark); width: fit-content; }
+.sample-sent { background: var(--ochre-soft); color: var(--ochre); }
+.sample-replied { background: var(--green-soft, #e6f2ea); color: var(--green); }
+.tile-samples { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--grout); }
+.tile-samples h3 { margin: 0; font-size: 1rem; }

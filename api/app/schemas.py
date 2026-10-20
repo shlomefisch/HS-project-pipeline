@@ -309,11 +309,15 @@ class EstimateLineUpdate(_In):
 
 
 class SampleCreate(_In):
-    description: str = Field(min_length=1)
+    """A sample is always of one tile on the job. The note says how many, which colors, and so on."""
+
+    candidate_id: int
+    note: str | None = None
     area_id: int | None = None
-    candidate_id: int | None = None
     expect_reply_by: date | None = None
     notes: str | None = None
+
+    _s = field_validator("note", "notes", mode="before")(_strip)
 
 
 class SampleUpdate(_In):

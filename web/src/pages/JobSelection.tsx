@@ -3,9 +3,13 @@ import { Photo } from "../photo";
 import { api } from "../api";
 import { go, niceDate, niceTime, plusDays, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Sheet, useAction } from "../ui";
-import type { Area, Candidate, Item, Job, Stock, Tag } from "../types";
+import type { Area, Candidate, Item, Job, Sample, Stock, Tag } from "../types";
 
 const SOURCE_SHORT: Record<string, string> = { stock: "Stock", local: "Local", overseas: "Overseas" };
+const SAMPLE_SHORT: Record<Sample["status"], string> = { requested: "sample to send", sent: "sample sent", replied: "sample back", cancelled: "" };
+
+/** The latest live sample of a tile, for the line on the list. */
+const sampleOf = (job: Job, c: Candidate) => [...job.samples].reverse().find((s) => s.candidate_id === c.id && s.status !== "cancelled");
 
 /** One flat list of tiles. Areas are tags, shown as groups — never folders to navigate into. */
 export function Selection({ job, reload }: { job: Job; reload: () => void }) {
@@ -14,7 +18,7 @@ export function Selection({ job, reload }: { job: Job; reload: () => void }) {
   const [tagSheet, setTagSheet] = useState<{ tag: Tag; cand: Candidate } | null>(null);
   const [areaSheet, setAreaSheet] = useState<Area | null>(null);
   const [newArea, setNewArea] = useState(false);
-  const [sample, setSample] = useState(false);
+  const older = job.samples.filter((s) => s.candidate_id == null);
 
   const untagged = job.candidates.filter((c) => c.tags.length === 0);
   const lines = (area: Area) =>
@@ -75,6 +79,7 @@ export function Selection({ job, reload }: { job: Job; reload: () => void }) {
                         {t.status === "chosen" ? ", chosen" : ""}
                         {t.status === "declined" && t.reason ? `, ${t.reason}` : ""}
                       </span>
+                      {sampleOf(job, c) && <span className={`sample-pill sample-${sampleOf(job, c)!.status}`}>{SAMPLE_SHORT[sampleOf(job, c)!.status]}</span>}
                     </span>
                     </button>
                   </li>
@@ -104,48 +109,17 @@ export function Selection({ job, reload }: { job: Job; reload: () => void }) {
         </div>
       )}
 
-      <div className="area-group">
-        <h3>Samples</h3>
-        {job.samples.length === 0 ? (
-          <p className="muted small">None requested.</p>
-        ) : (
-          <ul className="list list-quiet">
-            {job.samples.map((s) => (
-              <li key={s.id}>
-                <div className="row-static">
-                <span className={s.status === "cancelled" ? "struck" : ""}>{s.description}</span>
-                <span className="muted">
-                  {s.status === "requested" && "Requested — not sent yet"}
-                  {s.status === "sent" && `Sent ${niceDate(s.sent_on)}${s.expect_reply_by ? `, reply by ${niceDate(s.expect_reply_by)}` : ""}`}
-                  {s.status === "replied" && "They got back to us"}
-                  {s.status === "cancelled" && "Cancelled"}
-                </span>
-                </div>
-                {(s.status === "requested" || s.status === "sent") && (
-                  <button
-                    className="btn btn-small"
-                    onClick={async () => {
-                      await api.patch(`/samples/${s.id}`, s.status === "requested" ? { status: "sent", expect_reply_by: s.expect_reply_by ?? plusDays(7) } : { status: "replied" });
-                      reload();
-                    }}
-                  >
-                    {s.status === "requested" ? "Mark sent" : "They replied"}
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        <button className="btn btn-quiet" onClick={() => setSample(true)}>
-          Request a sample
-        </button>
-      </div>
+      {older.length > 0 && (
+        <div className="area-group">
+          <h3>Older samples, not tied to a tile</h3>
+          <SampleList samples={older} reload={reload} />
+        </div>
+      )}
 
       {adding && <AddTile job={job} onClose={() => setAdding(false)} onDone={() => { setAdding(false); reload(); }} />}
       {tagSheet && <TagSheet job={job} {...tagSheet} onClose={() => setTagSheet(null)} onDone={() => { setTagSheet(null); reload(); }} />}
       {areaSheet && <AreaSheet area={areaSheet} onClose={() => setAreaSheet(null)} onDone={() => { setAreaSheet(null); reload(); }} />}
       {newArea && <NewArea job={job} onClose={() => setNewArea(false)} onDone={() => { setNewArea(false); reload(); }} />}
-      {sample && <NewSample job={job} onClose={() => setSample(false)} onDone={() => { setSample(false); reload(); }} />}
     </section>
   );
 }
@@ -378,6 +352,7 @@ function TagSheet({ job, tag, cand, onClose, onDone }: { job: Job; tag: Tag; can
           )}
         </Field>
       )}
+      {!declining && <TileSamples job={job} cand={cand} areaId={isReal ? tag.area_id : null} onChanged={onDone} />}
       <ErrorLine error={error} />
       {cand.tags.every((t) => t.status === "considering") && !declining && (
         <div className="sheet-foot">
@@ -455,30 +430,77 @@ function AreaSheet({ area, onClose, onDone }: { area: Area; onClose: () => void;
   );
 }
 
-function NewSample({ job, onClose, onDone }: { job: Job; onClose: () => void; onDone: () => void }) {
-  const { toast } = useApp();
-  const [description, setDescription] = useState("");
-  const [areaId, setAreaId] = useState<number | null>(null);
+// ------------------------------------------------------------ samples
+function SampleList({ samples, reload }: { samples: Sample[]; reload: () => void }) {
   const { busy, error, run } = useAction();
   return (
-    <Sheet title="Request a sample" onClose={onClose}>
-      <Field label="Which samples">
-        <input autoFocus value={description} onChange={(e) => setDescription(e.target.value)} />
-      </Field>
-      <Field label="For">
-        <select value={areaId ?? ""} onChange={(e) => setAreaId(e.target.value ? Number(e.target.value) : null)}>
-          <option value="">The whole job</option>
-          {job.areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-      </Field>
+    <>
+      <ul className="list list-quiet">
+        {samples.map((s) => (
+          <li key={s.id}>
+            <div className="row-static">
+              <span className={s.status === "cancelled" ? "struck" : ""}>{s.description}</span>
+              <span className="muted">
+                {s.status === "requested" && `Requested ${niceDate(s.requested_on).toLowerCase()} — not sent yet`}
+                {s.status === "sent" && `Sent ${niceDate(s.sent_on)}${s.expect_reply_by ? `, reply by ${niceDate(s.expect_reply_by)}` : ""}`}
+                {s.status === "replied" && "They got back to us"}
+                {s.status === "cancelled" && "Cancelled"}
+              </span>
+            </div>
+            {(s.status === "requested" || s.status === "sent") && (
+              <button
+                className="btn btn-small"
+                disabled={busy}
+                onClick={() => run(async () => {
+                  await api.patch(`/samples/${s.id}`, s.status === "requested" ? { status: "sent", expect_reply_by: s.expect_reply_by ?? plusDays(7) } : { status: "replied" });
+                  reload();
+                })}
+              >
+                {s.status === "requested" ? "Mark sent" : "They replied"}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
       <ErrorLine error={error} />
-      <div className="actions">
-        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" disabled={busy || !description.trim()} onClick={() => run(async () => { await api.post(`/jobs/${job.id}/samples`, { description, area_id: areaId }); toast("Sample requested"); onDone(); })}>
-          Request sample
-        </button>
+    </>
+  );
+}
+
+/** Samples live on the tile: request one right here, and see where it stands. */
+function TileSamples({ job, cand, areaId, onChanged }: { job: Job; cand: Candidate; areaId: number | null; onChanged: () => void }) {
+  const { toast } = useApp();
+  const mine = job.samples.filter((s) => s.candidate_id === cand.id);
+  const [asking, setAsking] = useState(false);
+  const [note, setNote] = useState("");
+  const { busy, error, run } = useAction();
+  return (
+    <section className="tile-samples">
+      <div className="section-head">
+        <h3>Samples</h3>
+        {!asking && <button className="btn btn-small" onClick={() => setAsking(true)}>Request a sample</button>}
       </div>
-    </Sheet>
+      {mine.length === 0 && !asking && <p className="muted small">None of this tile yet.</p>}
+      {mine.length > 0 && <SampleList samples={mine} reload={onChanged} />}
+      {asking && (
+        <>
+          <Field label="How many, which colors" hint="Optional.">
+            <input autoFocus value={note} onChange={(e) => setNote(e.target.value)} />
+          </Field>
+          <ErrorLine error={error} />
+          <div className="actions">
+            <button className="btn btn-quiet" onClick={() => setAsking(false)}>Cancel</button>
+            <button
+              className="btn btn-primary"
+              disabled={busy}
+              onClick={() => run(async () => { await api.post(`/jobs/${job.id}/samples`, { candidate_id: cand.id, area_id: areaId, note: note || null }); toast("Sample requested"); onChanged(); })}
+            >
+              Request sample
+            </button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

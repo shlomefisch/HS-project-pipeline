@@ -98,9 +98,14 @@ def test_overseas_without_lead_time_is_flagged(jay):
     assert jay.get(f"/api/jobs/{job['id']}").json()["candidates"][0]["needs_lead_time"] is True
 
 
-def test_sample_marked_sent_gets_todays_date(jay):
+def test_a_sample_is_of_a_tile_and_marked_sent_gets_todays_date(jay):
     job = new_job(jay)
-    s = jay.post(f"/api/jobs/{job['id']}/samples", json={"description": "Calacatta + Carrara"}).json()
+    assert jay.post(f"/api/jobs/{job['id']}/samples", json={"note": "2 pieces"}).status_code == 422  # no tile
+    cand = jay.post(f"/api/jobs/{job['id']}/candidates", json={"source": "local", "name": "Calacatta"}).json()
+    s = jay.post(f"/api/jobs/{job['id']}/samples", json={"candidate_id": cand["id"], "note": "2 pieces"}).json()
+    assert s["candidate_id"] == cand["id"] and s["description"] == "Calacatta — 2 pieces"
+    other = new_job(jay)
+    assert jay.post(f"/api/jobs/{other['id']}/samples", json={"candidate_id": cand["id"]}).status_code == 422
     r = jay.patch(f"/api/samples/{s['id']}", json={"status": "sent"})
     assert r.json()["sent_on"] is not None
 

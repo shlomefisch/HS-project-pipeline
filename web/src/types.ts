@@ -130,6 +130,7 @@ export interface Sample {
   description: string;
   status: "requested" | "sent" | "replied" | "cancelled";
   area_id: number | null;
+  candidate_id: number | null;
   requested_on: string;
   sent_on: string | null;
   expect_reply_by: string | null;

@@ -273,11 +273,14 @@ def create_sample(job_id: int, body: SampleCreate, db: Session = Depends(get_db)
     job = get_job(db, job_id)
     if body.area_id is not None:
         _area_on_job(db, body.area_id, job.id)
-    if body.candidate_id is not None:
-        cand = db.get(Candidate, body.candidate_id)
-        if cand is None or cand.job_id != job.id:
-            raise HTTPException(422, "That tile isn't on this job.")
-    s = Sample(job_id=job.id, created_by=user.id, status="requested", **body.model_dump())
+    cand = db.get(Candidate, body.candidate_id)
+    if cand is None or cand.job_id != job.id or cand.removed_at is not None:
+        raise HTTPException(422, "That tile isn't on this job.")
+    item = db.get(Item, cand.netsuite_item_id) if cand.netsuite_item_id else None
+    tile = cand.name or (item.name if item else f"Item #{cand.netsuite_item_id}")
+    data = body.model_dump()
+    note = data.pop("note")
+    s = Sample(job_id=job.id, created_by=user.id, status="requested", description=f"{tile} — {note}" if note else tile, **data)
     db.add(s)
     db.commit()
     return row(s)
