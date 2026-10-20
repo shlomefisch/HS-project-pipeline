@@ -88,6 +88,8 @@ export interface ItemSyncStatus {
   every_minutes: number;
   items_active: number;
   items_total: number;
+  items_stock: number;
+  items_with_unit: number;
   running: boolean;
   runs: SyncRun[];
 }

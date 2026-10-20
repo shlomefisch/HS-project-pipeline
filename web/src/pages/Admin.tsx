@@ -126,7 +126,9 @@ function ItemSync() {
       ) : (
         <>
           <p className="muted">
-            {data.items_active.toLocaleString()} items in the list. Refreshes from NetSuite {data.every_minutes > 0 ? `every ${data.every_minutes} minutes` : "only when you press Sync now"}. Read-only — nothing is sent to NetSuite.
+            <strong>{data.items_stock.toLocaleString()} stocking items</strong> searchable (custitem4), out of {data.items_active.toLocaleString()} active in NetSuite.
+            {data.items_stock > 0 && data.items_with_unit < data.items_stock && ` ${(data.items_stock - data.items_with_unit).toLocaleString()} have no unit label.`}
+            {" "}Refreshes from NetSuite {data.every_minutes > 0 ? `every ${data.every_minutes} minutes` : "only when you press Sync now"}. Read-only — nothing is sent to NetSuite.
           </p>
           {last?.status === "failed" && <p className="error-line" role="alert">Last sync failed: {last.error}</p>}
           <ul className="list sync-runs">

@@ -23,6 +23,10 @@ def item_sync_status(db: Session = Depends(get_db), _: User = Depends(admin)):
         "every_minutes": settings.ns_sync_minutes,
         "items_active": db.scalar(select(func.count()).select_from(Item).where(Item.active.is_(True))),
         "items_total": db.scalar(select(func.count()).select_from(Item)),
+        "items_stock": db.scalar(select(func.count()).select_from(Item).where(Item.active.is_(True), Item.is_stock.is_(True))),
+        "items_with_unit": db.scalar(
+            select(func.count()).select_from(Item).where(Item.active.is_(True), Item.is_stock.is_(True), Item.unit.is_not(None))
+        ),
         "running": any(r.status == "running" for r in runs[:1]),
         "runs": [row(r) for r in runs],
     }
