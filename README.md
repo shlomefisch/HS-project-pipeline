@@ -24,6 +24,8 @@ stalls because nobody knew it was their turn.
 
 **Step templates** (Team → Step templates): steps a job gets by itself when it's created, when the takeoff is done, when an estimate is started, and when an area is decided — each with who (rep / takeoff person / whoever did it / a named person), due-in days, severity, and which playbook. Empty until filled.
 
+**Management overview** (Today → Everyone, management and admins): totals, people most behind first, jobs gone quiet for 14 days, jobs by department, loss reasons over 90 days, who is away.
+
 **Not yet:** the NetSuite push and read-back,  footage and availability, offline queue.
 The item list is a stand-in table until the sync exists.
 

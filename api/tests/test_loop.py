@@ -166,3 +166,25 @@ def test_visit_story_line_is_in_new_york_time(jay):
 def test_unknown_api_path_is_a_json_404(client):
     r = client.get("/api/nope")
     assert r.status_code == 404 and r.json()["detail"]
+
+
+def test_management_overview(boss, jay, office):
+    from app.db import SessionLocal
+    from app.models import AuditLog
+
+    job = new_job(jay)
+    t = jay.post(f"/api/jobs/{job['id']}/tasks", json=step(office.id, "Check stock", due="2020-01-01")).json()
+    assert t["id"]
+    assert jay.get("/api/dashboard/management").status_code == 403
+    m = boss.get("/api/dashboard/management").json()
+    office_row = [p for p in m["people"] if p["user_id"] == office.id][0]
+    assert office_row["overdue"] == 1 and m["people"][0]["user_id"] == office.id  # most behind first
+    assert m["by_class"]["Monsey Showroom"]["active"] == 1 and m["totals"]["quiet"] == 0
+    # Nothing touched in three weeks: quiet.
+    db = SessionLocal()
+    db.query(AuditLog).filter(AuditLog.job_id == job["id"]).update({"at": AuditLog.at - __import__("datetime").timedelta(days=21)})
+    db.commit()
+    db.close()
+    assert [q["id"] for q in boss.get("/api/dashboard/management").json()["quiet"]] == [job["id"]]
+    jay.post(f"/api/jobs/{job['id']}/lose", json={"reason": "price"})
+    assert boss.get("/api/dashboard/management").json()["losses"] == {"price": 1}

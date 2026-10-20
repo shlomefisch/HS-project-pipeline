@@ -5,6 +5,7 @@ import { Empty, Loading } from "../ui";
 import type { Job, Task, User, Visit } from "../types";
 import { ChangePasswordSheet } from "./Login";
 import { NotificationsBox } from "../notify";
+import { Overview } from "./Overview";
 import { CompleteTask } from "./TaskActions";
 
 interface RepView {
@@ -24,7 +25,8 @@ interface OfficeView {
 export function Today({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: User) => void }) {
   const { me, toast } = useApp();
   const [pwOpen, setPwOpen] = useState(false);
-  const [view, setView] = useState<"rep" | "office">(me.role === "rep" ? "rep" : "office");
+  const boss = me.is_admin || me.role === "management";
+  const [view, setView] = useState<"rep" | "office" | "overview">(me.role === "rep" ? "rep" : boss ? "overview" : "office");
   return (
     <main className="page">
       <header className="page-head">
@@ -36,9 +38,14 @@ export function Today({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: Us
           <button role="tab" aria-selected={view === "office"} className={view === "office" ? "on" : ""} onClick={() => setView("office")}>
             My tasks
           </button>
+          {boss && (
+            <button role="tab" aria-selected={view === "overview"} className={view === "overview" ? "on" : ""} onClick={() => setView("overview")}>
+              Everyone
+            </button>
+          )}
         </div>
       </header>
-      {view === "rep" ? <RepDashboard /> : <OfficeDashboard />}
+      {view === "rep" ? <RepDashboard /> : view === "office" ? <OfficeDashboard /> : <Overview />}
       <NotificationsBox />
       <footer className="page-foot">
         <span className="muted small">{me.email}</span>
