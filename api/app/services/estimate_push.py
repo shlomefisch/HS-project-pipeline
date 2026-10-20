@@ -203,4 +203,7 @@ def push(db: Session, est: Estimate, entity_id: int, customer_id: int | None, cr
             raise HTTPException(502, f"NetSuite didn't take the estimate. {exc}") from exc
 
     est.status, est.pushed_at, est.netsuite_estimate_id = "pushed", now(), existing
+    from .orders import place
+
+    place(db, est, by, str(existing), by_hand=False)
     return est

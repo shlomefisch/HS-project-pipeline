@@ -82,7 +82,7 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
             lines.append("Rep changed")
         if changed("status"):
             old, new = changes["status"]
-            lines.append(f"Job {new.replace('_', ' ')}" + (f" (was {old.replace('_', ' ')})" if old else ""))
+            lines.append(("Job closed — done" if new == "closed" else f"Job {new.replace('_', ' ')}") + (f" (was {old.replace('_', ' ')})" if old and new != "closed" else ""))
         if changed("class_code"):
             lines.append(f"Class set to {g('class_code')}")
         if changed("default_contact_id"):
@@ -116,7 +116,7 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
         if action == "insert":
             return "Estimate started"
         if changed("status"):
-            return {"discarded": "Estimate discarded", "pushed": "Estimate sent to NetSuite"}.get(g("status"))
+            return {"discarded": "Estimate discarded"}.get(g("status"))  # going out is told by the order line
         return None
 
     if table == "estimate_lines" and action == "update" and changed("price"):
@@ -144,8 +144,30 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
 
     if table == "candidates" and action == "insert":
         return f"Tile added: {g('name') or ('item #' + str(g('netsuite_item_id')))}"
-    if table == "candidates" and action == "delete":
+    if table == "candidates" and action == "update" and changed("removed_at") and g("removed_at"):
         return f"Tile removed (added by mistake): {g('name') or ('item #' + str(g('netsuite_item_id')))}"
+
+    if table == "orders":
+        if action == "insert":
+            return "Order placed" + (" — estimate entered in NetSuite by hand" if g("sent_by_hand") else " — estimate sent to NetSuite")
+        lines = []
+        if changed("stage"):
+            lines.append({
+                "processing": "Order approved — sales order made",
+                "delivery": "Order ready for delivery",
+                "closing": "Order delivered — closing",
+                "closed": "Order closed",
+                "lost": f"Order lost — {g('lost_reason')}",
+            }.get(g("stage"), f"Order: {g('stage')}"))
+        for col, label in (("chk_returns", "All returns taken back"), ("chk_credits", "All credits issued"), ("chk_paid", "Balance paid in full")):
+            if changed(col):
+                lines.append(f"{label} ✓" if g(col) else f"{label} — unticked")
+        if changed("chk_delivered") and not g("chk_delivered"):
+            lines.append("Everything delivered — unticked")
+        return "; ".join(lines) or None
+
+    if table == "order_changes" and action == "insert":
+        return f"Quantity changed after the order: {float(g('old_quantity')):g} → {float(g('new_quantity')):g} — {g('reason')}"
 
     if table == "candidate_tags" and action == "update" and changed("avail_checked_at") and g("avail_summary"):
         return g("avail_summary")

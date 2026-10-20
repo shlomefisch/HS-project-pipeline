@@ -16,9 +16,9 @@ from ..services.templates import ASSIGNEE_KINDS, PLAYBOOKS, TRIGGERS, _usable
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 
-Trigger = Literal["job_created", "takeoff_done", "estimate_started", "area_decided"]
+Trigger = Literal["job_created", "takeoff_done", "estimate_started", "area_decided", "order_placed", "order_approved", "order_delivery", "order_closing"]
 Playbook = Literal["all", "single_family", "projects"]
-Kind = Literal["rep", "takeoff", "actor", "user"]
+Kind = Literal["rep", "handler", "takeoff", "actor", "user"]
 Severity = Literal["silent", "notify", "interrupt"]
 
 

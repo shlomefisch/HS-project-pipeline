@@ -17,7 +17,7 @@ from . import scheduler
 from .services import push as _push  # noqa: F401  — registers the notification hooks
 from .config import settings
 from .db import engine
-from .routers import auth, dashboard, entities, estimates, jobs, meta, plans, push, selection, sync, tasks, team, templates, timeline, users
+from .routers import auth, dashboard, entities, estimates, jobs, meta, orders, plans, push, selection, sync, tasks, team, templates, timeline, users
 
 
 
@@ -34,7 +34,7 @@ from .idempotency import IdempotencyMiddleware  # noqa: E402
 
 app.add_middleware(IdempotencyMiddleware)
 
-for r in (meta, auth, users, entities, jobs, selection, plans, estimates, timeline, tasks, dashboard, sync, team, push, templates):
+for r in (meta, auth, users, entities, jobs, selection, plans, estimates, timeline, tasks, dashboard, sync, team, push, templates, orders):
     app.include_router(r.router, prefix="/api")
 
 

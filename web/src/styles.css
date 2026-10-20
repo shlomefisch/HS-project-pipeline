@@ -622,3 +622,25 @@ body:has(.login) { background: radial-gradient(120% 90% at 20% 0%, #24486a 0%, v
 .match-row { align-items: flex-start; padding: 8px 0; }
 .sent-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; flex-wrap: wrap; }
 .error-line ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* ---- orders */
+.order-card { background: var(--surface); border: 1px solid var(--grout); border-radius: 12px; padding: 16px; margin: 16px 0; }
+.order-card.order-closed { border-color: var(--sand); background: linear-gradient(180deg, var(--sand-soft), var(--surface) 60%); }
+.order-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.order-head h2 { margin: 0 0 2px; }
+.order-total { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.order-track { list-style: none; padding: 0; margin: 14px 0 4px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.order-track li { text-align: center; font-size: 0.76rem; font-weight: 600; color: var(--stone); padding: 8px 2px; border-radius: 4px; background: var(--grout); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.order-track li.done { background: var(--sand); color: #fff; }
+.order-track li.now { background: var(--slate); color: #fff; }
+.checklist { margin-top: 12px; padding: 10px 12px; background: var(--porcelain); border-radius: 8px; }
+.checklist h3 { font-size: 0.85rem; color: var(--sand-dark); margin: 0 0 4px; }
+.checklist .checked span { color: var(--green); }
+.order-lines { margin-top: 12px; }
+.order-lines summary { cursor: pointer; font-weight: 600; color: var(--glaze); padding: 6px 0; }
+.order-line { flex-direction: column; align-items: flex-start !important; padding: 8px 0; gap: 2px; }
+.changes { margin: 8px 0 0; padding-left: 18px; color: var(--stone); }
+.close-job { margin: 24px 0; padding: 16px; border: 1px dashed var(--sand); border-radius: 12px; }
+.status-closed { background: var(--sand-soft); color: var(--sand-dark); }
+.area-ordered { border-style: solid; border-color: var(--sand); }
+.area-delivered { border-color: var(--green); color: var(--green); }

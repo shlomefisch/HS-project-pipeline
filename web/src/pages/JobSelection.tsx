@@ -28,7 +28,7 @@ export function Selection({ job, reload }: { job: Job; reload: () => void }) {
         {job.areas.map((a) => (
           <button role="listitem" key={a.id} className={`area-chip area-${a.status}`} onClick={() => setAreaSheet(a)}>
             {a.name}
-            <span className="area-state">{a.status === "open" ? "" : a.status === "on_hold" ? "on hold" : a.status}</span>
+            <span className="area-state">{a.status === "open" ? "" : a.status === "on_hold" ? "on hold" : a.status === "ordered" ? "on an order" : a.status}</span>
           </button>
         ))}
         <button className="area-chip area-add" onClick={() => setNewArea(true)}>

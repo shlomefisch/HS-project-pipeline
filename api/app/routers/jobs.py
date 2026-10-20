@@ -169,7 +169,7 @@ def job_detail(db: Session, job: Job) -> dict:
         .order_by(JobRole.active.desc(), JobRole.started_at)
     ).all()
     areas = list(db.scalars(select(Area).where(Area.job_id == job.id).order_by(Area.sort_order, Area.id)))
-    candidates = list(db.scalars(select(Candidate).where(Candidate.job_id == job.id).order_by(Candidate.id)))
+    candidates = list(db.scalars(select(Candidate).where(Candidate.job_id == job.id, Candidate.removed_at.is_(None)).order_by(Candidate.id)))
     tags = list(db.scalars(select(CandidateTag).where(CandidateTag.job_id == job.id).order_by(CandidateTag.id)))
     item_ids = {c.netsuite_item_id for c in candidates if c.netsuite_item_id}
     items = {i.netsuite_id: i for i in db.scalars(select(Item).where(Item.netsuite_id.in_(list(item_ids))))} if item_ids else {}

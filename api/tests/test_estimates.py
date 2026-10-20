@@ -87,7 +87,7 @@ def test_a_zero_quantity_is_refused_not_a_crash(jay, job):
 
 def test_progress_fills_from_the_left(jay, job):
     p = jay.get(f"/api/jobs/{job['id']}").json()["progress"]
-    assert [s["done"] for s in p["stages"]] == [True, True, False, False, False, False]  # chosen tiles, no footage yet
+    assert [s["done"] for s in p["stages"]] == [True, True, False, False, False, False, False, False]  # chosen tiles, no footage yet
     assert p["current"] == "Footage"
     _footage(jay, job["kitchen"], 100)
     _footage(jay, job["mud"], 80)

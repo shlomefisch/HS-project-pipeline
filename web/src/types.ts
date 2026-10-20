@@ -47,7 +47,7 @@ export interface Area {
   id: number;
   job_id: number;
   name: string;
-  status: "open" | "decided" | "dropped" | "on_hold";
+  status: "open" | "decided" | "dropped" | "on_hold" | "ordered" | "delivered";
   hold_until: string | null;
   hold_reason: string | null;
   sort_order: number;
@@ -358,4 +358,24 @@ export interface Progress {
   stages: { key: string; label: string; done: boolean }[];
   done: number;
   current: string;
+}
+
+export interface Order {
+  id: number;
+  job_id: number;
+  estimate_id: number;
+  stage: "negotiating" | "processing" | "delivery" | "closing" | "closed" | "lost";
+  handler_id: number | null;
+  netsuite_estimate_ref: string | null;
+  netsuite_order_ref: string | null;
+  sent_by_hand: boolean;
+  lost_reason: string | null;
+  created_at: string;
+  closed_at: string | null;
+  lines: (EstimateLine & { amount: number | null })[];
+  total: number;
+  area_ids: number[];
+  changes: { id: number; line_id: number; old_quantity: number; new_quantity: number; reason: string; created_at: string; created_by: number | null }[];
+  checks: Record<"delivered" | "returns" | "credits" | "paid", string | null>;
+  check_labels: Record<string, string>;
 }

@@ -4,6 +4,7 @@ import { niceDate, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Loading, Sheet, useAction } from "../ui";
 import type { Estimate, EstimateLine, Job } from "../types";
 import { SendEstimate } from "./SendEstimate";
+import { celebrateHere } from "../celebrate";
 
 const money = (n: number | null) => (n == null ? "—" : n.toLocaleString(undefined, { style: "currency", currency: "USD" }));
 const qtyFmt = (n: number | null) => (n == null ? "—" : n.toLocaleString(undefined, { maximumFractionDigits: 2 }));
@@ -81,6 +82,7 @@ function Draft({ job, est, onChanged }: { job: Job; est: Estimate; onChanged: ()
   const [editing, setEditing] = useState<EstimateLine | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [sending, setSending] = useState(false);
+  const [byHand, setByHand] = useState(false);
   const { busy, error, run } = useAction();
   const areaNames = est.area_ids.map((id) => job.areas.find((a) => a.id === id)?.name).filter(Boolean).join(", ");
   return (
@@ -114,8 +116,10 @@ function Draft({ job, est, onChanged }: { job: Job; est: Estimate; onChanged: ()
       <div className="actions actions-wrap">
         <button className="btn btn-quiet" disabled={busy} onClick={() => setConfirmDiscard(true)}>Discard</button>
         <button className="btn" disabled={busy} onClick={() => run(async () => { await api.post(`/estimates/${est.id}/refresh-prices`); onChanged(); })}>Re-read prices</button>
+        <button className="btn" disabled={busy} onClick={() => setByHand(true)}>Entered in NetSuite by hand</button>
         <button className="btn btn-primary" disabled={busy} onClick={() => setSending(true)}>Send to NetSuite</button>
       </div>
+      {byHand && <ByHandSheet est={est} onClose={() => setByHand(false)} onDone={() => { setByHand(false); celebrateHere(); onChanged(); }} />}
       {sending && <SendEstimate est={est} onClose={() => setSending(false)} onDone={() => { setSending(false); onChanged(); }} />}
       {editing && <LineSheet line={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); onChanged(); }} />}
       {confirmDiscard && (
@@ -162,6 +166,22 @@ function LineSheet({ line, onClose, onDone }: { line: EstimateLine; onClose: () 
         >
           Save
         </button>
+      </div>
+    </Sheet>
+  );
+}
+
+function ByHandSheet({ est, onClose, onDone }: { est: Estimate; onClose: () => void; onDone: () => void }) {
+  const [ref, setRef] = useState("");
+  const { busy, error, run } = useAction();
+  return (
+    <Sheet title="Entered in NetSuite by hand" onClose={onClose}>
+      <p className="muted small">The estimate is in NetSuite already. It becomes an order here, and its areas move with the order from now on.</p>
+      <Field label="NetSuite estimate number" hint="Optional, but it helps find it later."><input autoFocus value={ref} onChange={(e) => setRef(e.target.value)} placeholder="EST-2201" /></Field>
+      <ErrorLine error={error} />
+      <div className="actions">
+        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={busy} onClick={() => run(async () => { await api.post(`/estimates/${est.id}/sent-by-hand`, { netsuite_ref: ref || null }); onDone(); })}>Make it an order</button>
       </div>
     </Sheet>
   );

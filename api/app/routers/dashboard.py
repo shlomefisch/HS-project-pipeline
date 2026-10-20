@@ -1,7 +1,7 @@
 """Each role's first screen."""
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..auth import member
@@ -25,10 +25,16 @@ def rep_view(rep_id: int | None = None, db: Session = Depends(get_db), user: Use
     t0 = today()
     start, end = day_bounds(t0)
 
+    from ..models import Order
+
+    # Before the sale it's the rep's; on an approved order, it's the handler's.
     went_wrong = db.execute(
-        select(Task, Job).join(Job, Job.id == Task.job_id)
+        select(Task, Job).join(Job, Job.id == Task.job_id).outerjoin(Order, Order.id == Task.order_id)
         .where(
-            Job.rep_id == rid,
+            or_(
+                and_(Job.rep_id == rid, or_(Task.order_id.is_(None), Order.handler_id.is_(None))),
+                Order.handler_id == rid,
+            ),
             or_(Task.needs_rep_attention.is_(True), Task.status == "blocked"),
         )
         .order_by(Task.due_date)

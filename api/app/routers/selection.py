@@ -56,6 +56,8 @@ def update_area(area_id: int, body: AreaUpdate, db: Session = Depends(get_db), u
         raise HTTPException(404, "Area not found.")
     data = body.model_dump(exclude_unset=True)
     refuse_nulls(data, "name", "status", "sort_order")
+    if "status" in data and area.status in ("ordered", "delivered"):
+        raise HTTPException(409, f"{area.name} is on an order — it moves with the order now.")
     if "name" in data and not data["name"].strip():
         raise HTTPException(422, "An area needs a name.")
     status = data.get("status")
@@ -141,21 +143,16 @@ def update_candidate(candidate_id: int, body: CandidateUpdate, db: Session = Dep
 
 
 @router.delete("/candidates/{candidate_id}")
-def remove_candidate(candidate_id: int, db: Session = Depends(get_db), _: User = Depends(writer)):
+def remove_candidate(candidate_id: int, db: Session = Depends(get_db), user: User = Depends(writer)):
     """For tiles added by mistake: only while nothing has been decided on them.
-    A tile that was chosen or declined anywhere stays, crossed out, for the history."""
+    The tile is hidden, never deleted — nothing in the record is ever thrown away."""
     cand = db.get(Candidate, candidate_id)
-    if cand is None:
+    if cand is None or cand.removed_at is not None:
         raise HTTPException(404, "Tile not found.")
     tags = list(db.scalars(select(CandidateTag).where(CandidateTag.candidate_id == cand.id)))
     if any(t.status != "considering" for t in tags):
         raise HTTPException(409, "This tile was chosen or declined for an area, so it stays on the job. Decline it instead.")
-    for smp in db.scalars(select(Sample).where(Sample.candidate_id == cand.id)):
-        smp.candidate_id = None  # the sample stays on the job, just not tied to this tile
-    for t in tags:
-        db.delete(t)
-    db.flush()
-    db.delete(cand)
+    cand.removed_at, cand.removed_by = now(), user.id
     db.commit()
     return {"ok": True}
 

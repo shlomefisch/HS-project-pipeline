@@ -87,7 +87,7 @@ def test_push_makes_an_estimate_with_our_prices_and_remembers_the_customer(jay, 
     assert body["externalId"] == f"pipeline-est-{ready['est']['id']}"
     assert jay.get(f"/api/entities/{ready['owner']['id']}").json()["entity"]["netsuite_customer_id"] == "55"
     story = [e["summary"] for e in jay.get(f"/api/jobs/{ready['job']['id']}/timeline").json()]
-    assert "Estimate sent to NetSuite" in story
+    assert "Order placed — estimate sent to NetSuite" in story
 
 
 def test_already_there_is_not_made_twice(jay, ready, monkeypatch):

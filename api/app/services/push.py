@@ -201,10 +201,17 @@ def plan_message(db: Session, kind: str, oid: int) -> list[tuple]:
             by = db.get(User, t.created_by) if t.created_by else None
             who = by.name if by else "Someone"
             return [(t.assignee_id, f"Next step for you — {job.name}", f"{t.title} (from {who}, due {t.due_date:%b} {t.due_date.day})", url, t.severity == "interrupt")]
-        if job.rep_id == t.completed_by:
+        owner = job.rep_id
+        if t.order_id:
+            from ..models import Order
+
+            o = db.get(Order, t.order_id)
+            if o is not None and o.handler_id:
+                owner = o.handler_id
+        if owner == t.completed_by:
             return []
         label = "Bad answer" if t.status == "bad_answer" else "Blocked"
-        return [(job.rep_id, f"{label} — {job.name}", f"{t.title}: {t.outcome_note or ''}".strip(), url, True)]
+        return [(owner, f"{label} — {job.name}", f"{t.title}: {t.outcome_note or ''}".strip(), url, True)]
     if kind == "event":
         e = db.get(Event, oid)
         if e is None:

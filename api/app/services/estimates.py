@@ -34,6 +34,9 @@ def create(db: Session, job: Job, area_ids: list[int], note: str | None, by: Use
     areas = [db.get(Area, a) for a in dict.fromkeys(area_ids)]
     if any(a is None or a.job_id != job.id for a in areas):
         raise HTTPException(422, "Those areas aren't all on this job.")
+    ordered = [a.name for a in areas if a.status in ("ordered", "delivered")]
+    if ordered:
+        raise HTTPException(422, f"{', '.join(ordered)} is already on an order. A change there is a change to that order; new work is a new area.")
     held = [a.name for a in areas if a.status in ("on_hold", "dropped")]
     if held:
         raise HTTPException(422, f"{', '.join(held)} is on hold or dropped — it becomes its own order later.")

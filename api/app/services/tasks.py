@@ -69,7 +69,14 @@ def complete(db: Session, task: Task, outcome: str, note: str | None, step: Next
     if task.status not in TASK_OPEN:
         raise HTTPException(409, "This task is already closed.")
     job = db.get(Job, task.job_id)
-    is_rep = by.id == job.rep_id
+    owner_id = job.rep_id
+    if task.order_id:
+        from ..models import Order
+
+        o = db.get(Order, task.order_id)
+        if o is not None and o.handler_id:
+            owner_id = o.handler_id  # after the sale, the rep is out of the loop
+    is_rep = by.id == owner_id
 
     if outcome in ("blocked", "bad_answer", "skipped") and not note:
         raise HTTPException(422, "Say what happened — a note is required.")

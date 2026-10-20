@@ -160,6 +160,8 @@ class Candidate(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _now()
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # hidden, never deleted
+    removed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class CandidateTag(Base):
@@ -264,6 +266,7 @@ class Task(Base):
     kind: Mapped[str | None] = mapped_column(Text)  # "takeoff", or None for an ordinary step
     covering_for_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     template_step_id: Mapped[int | None] = mapped_column(ForeignKey("step_templates.id"))
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
 
 
 class StepTemplate(Base):
@@ -384,6 +387,39 @@ class EstimateLine(Base):
     price: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
     price_note: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Order(Base):
+    __tablename__ = "orders"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
+    estimate_id: Mapped[int] = mapped_column(ForeignKey("estimates.id"), unique=True)
+    stage: Mapped[str] = mapped_column(Text, default="negotiating")
+    handler_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    netsuite_estimate_ref: Mapped[str | None] = mapped_column(Text)
+    netsuite_order_ref: Mapped[str | None] = mapped_column(Text)
+    sent_by_hand: Mapped[bool] = mapped_column(Boolean, default=False)
+    chk_delivered: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    chk_returns: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    chk_credits: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    chk_paid: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lost_reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class OrderChange(Base):
+    __tablename__ = "order_changes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
+    line_id: Mapped[int] = mapped_column(ForeignKey("estimate_lines.id"))
+    old_quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    new_quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    reason: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class AuditLog(Base):
