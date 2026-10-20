@@ -202,6 +202,7 @@ def job_detail(db: Session, job: Job) -> dict:
             "tasks": [row(t) for t in tasks],
             "visits": [row(v) for v in visits],
             "open_tasks": len(open_tasks),
+            "open_takeoff_id": next((t.id for t in open_tasks if t.kind == "takeoff"), None),
             "stuck": job.status == "active" and not open_tasks,
         }
     )

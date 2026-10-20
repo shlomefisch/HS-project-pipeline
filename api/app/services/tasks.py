@@ -78,6 +78,14 @@ def complete(db: Session, task: Task, outcome: str, note: str | None, step: Next
             return create_task(db, job, step, by, parent_task_id=task.id)
         return None
 
+    if task.kind == "takeoff" and outcome == "done":
+        areas = list(db.scalars(select(Area).where(Area.job_id == job.id, Area.status.in_(("open", "decided")))))
+        if not areas:
+            raise HTTPException(422, "Add the job's areas first — the takeoff gives each one its footage.")
+        missing = [a.name for a in areas if a.footage is None]
+        if missing:
+            raise HTTPException(422, "The takeoff isn't done until every area has footage. Still missing: " + ", ".join(missing) + ".")
+
     if outcome == "bad_answer" and step is None:
         raise HTTPException(422, "A bad answer needs a next step — usually the rep calling the customer.")
 

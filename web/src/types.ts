@@ -51,6 +51,11 @@ export interface Area {
   hold_until: string | null;
   hold_reason: string | null;
   sort_order: number;
+  footage: number | null;
+  footage_source: "customer" | "designer" | "installer" | "takeoff" | null;
+  footage_by: string | null;
+  footage_confidence: "approximate" | "confirmed" | null;
+  footage_set_at: string | null;
 }
 
 export interface Tag {
@@ -130,6 +135,7 @@ export interface Task {
   severity: "silent" | "notify" | "interrupt";
   outcome_note: string | null;
   needs_rep_attention: boolean;
+  kind?: "takeoff" | null;
   job_name?: string;
   job_rep_id?: number;
   overdue?: boolean;
@@ -157,6 +163,7 @@ export interface JobSummary {
   rep: User | null;
   default_contact: Entity | null;
   open_tasks: number;
+  open_takeoff_id?: number | null;
   next_due: string | null;
   stuck: boolean;
 }
@@ -226,4 +233,28 @@ export interface Stock {
   by_lot: boolean;
   rows: StockRow[];
   totals: { on_hand: number; available: number };
+}
+
+export interface JobFile {
+  id: number;
+  job_id: number;
+  area_id: number | null;
+  kind: "plan" | "photo" | "note" | "other";
+  name: string;
+  content_type: string | null;
+  size_bytes: number | null;
+  source: "upload" | "link" | "from_link";
+  link_url: string | null;
+  link_id: number | null;
+  status: "ready" | "fetching" | "needs_download";
+  problem: string | null;
+  created_at: string;
+  created_by: number | null;
+  url: string | null;
+  opens_inline: boolean;
+}
+
+export interface AppSettings {
+  takeoff_user_id: number | null;
+  takeoff_user: User | null;
 }

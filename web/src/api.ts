@@ -57,11 +57,12 @@ async function request<T>(method: string, path: string, body?: unknown, params?:
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
 
   let res: Response;
   try {
-    res = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    res = await fetch(url, { method, headers, body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body) });
   } catch {
     throw new ApiError(0, "No connection. Check the signal and try again.", null);
   }
@@ -80,4 +81,7 @@ export const api = {
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body ?? {}),
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
   del: <T>(path: string) => request<T>("DELETE", path),
+  put: <T>(path: string, body: unknown) => request<T>("PUT", path, body),
+  /** Files: the browser sets the multipart boundary itself. */
+  upload: <T>(path: string, form: FormData) => request<T>("POST", path, form),
 };

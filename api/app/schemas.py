@@ -203,6 +203,46 @@ class AreaUpdate(_In):
     sort_order: int | None = None
 
 
+class FootageSet(_In):
+    """One final number for the area, waste included. Send footage=null to clear it."""
+
+    footage: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=2)
+    source: Literal["customer", "designer", "installer", "takeoff"] | None = None
+    by: str | None = None
+    confidence: Literal["approximate", "confirmed"] | None = None
+
+    _s = field_validator("by", mode="before")(_strip)
+
+
+class TakeoffRequest(_In):
+    assignee_id: int | None = None  # default: the takeoff person set on the Team screen
+    due_date: date | None = None
+    notes: str | None = None
+
+    _s = field_validator("notes", mode="before")(_strip)
+
+
+class LinkAdd(_In):
+    url: str
+    kind: Literal["plan", "photo", "note", "other"] = "plan"
+    area_id: int | None = None
+
+    _s = field_validator("url", mode="before")(_strip)
+
+
+class FileUpdate(_In):
+    name: str | None = None
+    kind: Literal["plan", "photo", "note", "other"] | None = None
+    area_id: int | None = None
+    removed: bool | None = None
+
+    _s = field_validator("name", mode="before")(_strip)
+
+
+class SettingsUpdate(_In):
+    takeoff_user_id: int | None = None
+
+
 class CandidateCreate(_In):
     source: Literal["stock", "local", "overseas"]
     netsuite_item_id: int | None = None

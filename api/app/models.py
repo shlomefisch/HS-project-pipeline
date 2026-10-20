@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     Numeric,
     Text,
     func,
@@ -105,6 +106,11 @@ class Area(Base):
     hold_until: Mapped[date | None] = mapped_column(Date)
     hold_reason: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    footage: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    footage_source: Mapped[str | None] = mapped_column(Text)
+    footage_by: Mapped[str | None] = mapped_column(Text)
+    footage_confidence: Mapped[str | None] = mapped_column(Text)
+    footage_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
@@ -244,6 +250,43 @@ class Task(Base):
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str | None] = mapped_column(Text)  # "takeoff", or None for an ordinary step
+
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    value: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = _now()
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+
+class JobFile(Base):
+    __tablename__ = "job_files"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
+    area_id: Mapped[int | None] = mapped_column(ForeignKey("areas.id"))
+    kind: Mapped[str] = mapped_column(Text, default="plan")
+    name: Mapped[str] = mapped_column(Text)
+    content_type: Mapped[str | None] = mapped_column(Text)
+    size_bytes: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(Text)
+    link_url: Mapped[str | None] = mapped_column(Text)
+    link_id: Mapped[int | None] = mapped_column(ForeignKey("job_files.id"))
+    status: Mapped[str] = mapped_column(Text, default="ready")
+    problem: Mapped[str | None] = mapped_column(Text)
+    removed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = _now()
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+
+class FileBlob(Base):
+    """File bytes. Written and read with plain SQL only — never through the session,
+    so the audit log never sees them."""
+
+    __tablename__ = "file_blobs"
+    file_id: Mapped[int] = mapped_column(ForeignKey("job_files.id"), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 class AuditLog(Base):

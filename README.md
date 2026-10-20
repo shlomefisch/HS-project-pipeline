@@ -16,6 +16,8 @@ stalls because nobody knew it was their turn.
 
 **NetSuite:** read-only item sync (inventory items, hourly, plus Sync now on the Team screen), and live stock on a stock tile — free and on hand by location and lot (cached 5 minutes).
 
+**Order assembly (first part):** plans and photos on the job (upload, phone camera, Dropbox / Google Drive links pulled in), footage per area with its source and confidence, and the takeoff task (default person on the Team screen; it can't close until every area has footage). Files are kept in the database.
+
 **Not yet:** the NetSuite push and read-back,  push notifications, templates, footage and availability, away/gone, offline queue.
 The item list is a stand-in table until the sync exists.
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { niceDate, niceTime, useApp, useLoad } from "../state";
 import { ErrorLine, Field, Loading, Sheet, useAction } from "../ui";
-import type { ItemSyncStatus, SyncRun, User } from "../types";
+import type { AppSettings, ItemSyncStatus, SyncRun, User } from "../types";
 
 const ROLE_LABEL: Record<string, string> = {
   pending: "Waiting for setup",
@@ -45,6 +45,7 @@ export function Admin() {
         <h2>Everyone</h2>
         <ul className="list">{rest.map(row)}</ul>
       </section>
+      <Defaults people={data.filter((u) => u.active && u.role !== "pending")} />
       <ItemSync />
       {adding && <AddUser onClose={() => setAdding(false)} onDone={() => { setAdding(false); reload(); refreshUsers(); }} />}
       {editing && <EditUser user={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); reload(); refreshUsers(); }} />}
@@ -270,5 +271,34 @@ function PasswordHandoff({ name, email, password }: { name: string; email: strin
       </dl>
       <p className="muted small">This is the only time the password is shown.</p>
     </div>
+  );
+}
+
+function Defaults({ people }: { people: User[] }) {
+  const { toast } = useApp();
+  const { data, error, reload } = useLoad(() => api.get<AppSettings>("/settings"), []);
+  const { busy, error: saveError, run } = useAction();
+  if (!data) return <section className="section"><h2>Defaults</h2><Loading error={error} /></section>;
+  return (
+    <section className="section">
+      <h2>Defaults</h2>
+      <Field label="Takeoff person" hint="New takeoffs go to them. Anyone can pick someone else on the job when they're out.">
+        <select
+          value={data.takeoff_user_id ?? ""}
+          disabled={busy}
+          onChange={(e) =>
+            run(async () => {
+              await api.put("/settings", { takeoff_user_id: e.target.value ? Number(e.target.value) : null });
+              reload();
+              toast("Saved.");
+            })
+          }
+        >
+          <option value="">Nobody yet</option>
+          {people.map((u) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+        </select>
+      </Field>
+      <ErrorLine error={saveError} />
+    </section>
   );
 }

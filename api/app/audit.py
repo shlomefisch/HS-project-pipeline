@@ -53,6 +53,15 @@ def _row_id(obj: Base) -> str:
 
 
 # ------------------------------------------------------------ story lines
+def _footage_line(g) -> str:
+    if g("footage") is None:
+        return f"{g('name')}: footage cleared"
+    value = float(g("footage"))
+    num = f"{value:,.0f}" if value == int(value) else f"{value:,.2f}"
+    src = {"takeoff": "our takeoff"}.get(g("footage_source"), g("footage_source"))
+    return f"{g('name')} footage: {num} sf, {g('footage_confidence')} — from {src} ({g('footage_by')})"
+
+
 def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
     """A one-line human summary for changes worth reading on the job's story."""
     g = lambda f: getattr(obj, f, None)  # noqa: E731
@@ -88,6 +97,9 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
             return f"{role.capitalize()} removed from the job"
         return None
 
+    if table == "areas" and action == "update" and changed("footage"):
+        return _footage_line(g)
+
     if table == "areas":
         if action == "insert":
             return f"Area added: {g('name')}"
@@ -96,6 +108,22 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
         if changed("name"):
             old, new = changes["name"]
             return f"Area renamed from {old} to {new}"
+        return None
+
+    if table == "job_files":
+        label = {"plan": "Plan", "photo": "Photo", "note": "Note", "other": "File"}.get(g("kind"), "File")
+        if action == "insert":
+            if g("source") == "upload":
+                return f"{label} added: {g('name')}"
+            if g("source") == "link":
+                return f"Link added: {g('link_url')}"
+            return None  # files pulled from a folder: the folder line says how many
+        if changed("removed") and g("removed"):
+            return f"{label} removed: {g('name')}"
+        if changed("status") and g("status") == "ready" and g("source") == "link":
+            return f"Pulled in from the link: {g('name')}"
+        if changed("status") and g("status") == "needs_download":
+            return f"Link needs a download: {g('problem')}"
         return None
 
     if table == "candidates" and action == "insert":
