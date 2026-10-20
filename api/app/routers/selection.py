@@ -228,7 +228,7 @@ def resolve_item(code: str, db: Session = Depends(get_db), _: User = Depends(mem
 
 
 @router.get("/items/{item_id}/stock")
-def item_stock(item_id: int, fresh: bool = False, _: User = Depends(member)):
+def item_stock(item_id: int, fresh: bool = False, db: Session = Depends(get_db), _: User = Depends(member)):
     """Live from NetSuite: on hand and still free, by location and lot."""
     from ..config import settings
     from ..netsuite import NetSuiteError
@@ -237,15 +237,22 @@ def item_stock(item_id: int, fresh: bool = False, _: User = Depends(member)):
 
     if not settings.netsuite_configured:
         raise HTTPException(409, "NetSuite isn't connected, so stock can't be checked.")
+    item = db.get(Item, item_id)
+    if item is not None and not item.is_stock:
+        raise HTTPException(409, "Not a stocking item — it was ordered for a project, so there's no stock to check.")
     try:
-        return stock.get(client_from_settings, item_id, fresh=fresh)
+        result = dict(stock.get(client_from_settings, item_id, fresh=fresh))
+        if item is not None and item.unit:
+            result["unit"] = item.unit  # the synced unit beats the live lookup
+        return result
     except NetSuiteError as exc:
         raise HTTPException(502, f"Couldn't get stock from NetSuite. {exc}") from exc
 
 
 @router.get("/items")
 def search_items(q: str = "", limit: int = 25, db: Session = Depends(get_db), _: User = Depends(member)):
-    stmt = select(Item).where(Item.active.is_(True))
+    # Only real stocking items (custitem4); one-off project items stay out of the way.
+    stmt = select(Item).where(Item.active.is_(True), Item.is_stock.is_(True))
     text = q.strip().lower()
     if text:
         like = f"%{text}%"

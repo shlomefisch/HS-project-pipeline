@@ -16,6 +16,10 @@ class FakeNetSuite:
         after = 0
         while True:
             sql = sql_for_after(after)
+            if "unitstypeuom" in sql:
+                if after == 0:
+                    yield [{"id": "1", "abbr": "SF", "name": "Square Foot"}, {"id": "2", "abbr": "PC", "name": "Piece"}]
+                return
             self.queries.append(sql)
             if self.fail:
                 raise NetSuiteError(self.fail)
@@ -26,8 +30,9 @@ class FakeNetSuite:
             after = int(page[-1]["id"])
 
 
-def ns(i, code, display="", inactive="F", lot="F"):
-    return {"id": str(i), "itemid": code, "displayname": display, "isinactive": inactive, "islotitem": lot}
+def ns(i, code, display="", inactive="F", lot="F", stock="T", unit="1"):
+    return {"id": str(i), "itemid": code, "displayname": display, "isinactive": inactive, "islotitem": lot,
+            "custitem4": stock, "stockunit": unit}
 
 
 def _engine():
@@ -75,6 +80,18 @@ def test_only_admins_see_sync_and_button_needs_keys(client, boss, jay):
     assert boss.post("/api/sync/items").status_code == 409
 
 
+def test_only_stocking_items_show_in_search_and_units_come_along(client, jay):
+    item_sync.run(_engine(), FakeNetSuite([ns(1, "REAL-1", "Real Tile"), ns(2, "ONEOFF-1", "Real Tile one-off", stock="F"), ns(3, "TRIM-1", "Real Tile trim", unit="2")]))
+    found = jay.get("/api/items", params={"q": "real tile"}).json()
+    assert sorted(i["netsuite_id"] for i in found) == [1, 3]
+    assert {i["netsuite_id"]: i["unit"] for i in found} == {1: "SF", 3: "PC"}
+    # A one-off still resolves from a scan, so an old job keeps its name; it just isn't offered.
+    assert jay.get("/api/items/resolve", params={"code": "2"}).json()["found"] is True
+
+
 def test_row_mapping():
-    assert item_sync.to_item(ns(5, "SKU-5", "Nice Tile")) == {"netsuite_id": 5, "name": "Nice Tile", "sku": "SKU-5", "active": True, "is_lot": False}
+    assert item_sync.to_item(ns(5, "SKU-5", "Nice Tile"), {1: "SF"}) == {
+        "netsuite_id": 5, "name": "Nice Tile", "sku": "SKU-5", "active": True, "is_lot": False,
+        "is_stock": True, "unit_id": 1, "unit": "SF",
+    }
     assert item_sync.to_item({"id": "6", "itemid": None, "displayname": None})["name"] == "Item #6"

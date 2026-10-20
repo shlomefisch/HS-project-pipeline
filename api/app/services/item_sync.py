@@ -24,7 +24,8 @@ FULL_EVERY = timedelta(hours=20)
 STALE_RUN = timedelta(hours=2)
 
 ITEM_SQL = (
-    "SELECT item.id, item.itemid, item.displayname, item.isinactive, item.islotitem "
+    "SELECT item.id, item.itemid, item.displayname, item.isinactive, item.islotitem, "
+    "item.custitem4, item.stockunit "
     "FROM item WHERE item.itemtype = 'InvtPart' AND item.id > {after}{since} ORDER BY item.id"
 )
 
@@ -36,17 +37,47 @@ def client_from_settings() -> SuiteQL:
                         settings.ns_token_id, settings.ns_token_secret))
 
 
-def to_item(r: dict) -> dict:
+# Unit names (SF, PC, ...) by unit id. Read on its own: if the role can't see units,
+# the sync still works and only the unit labels are missing.
+UNIT_SQL = "SELECT u.internalid AS id, u.abbreviation AS abbr, u.unitname AS name FROM unitstypeuom u"
+
+
+def unit_names(client) -> dict[int, str]:
+    try:
+        names: dict[int, str] = {}
+        for page in client.by_id(lambda after: f"{UNIT_SQL} WHERE u.internalid > {after} ORDER BY u.internalid"):
+            for r in page:
+                label = (r.get("abbr") or r.get("name") or "").strip()
+                if label:
+                    names[int(r["id"])] = label
+        return names
+    except NetSuiteError as exc:
+        log.warning("unit names unavailable: %s", exc)
+        return {}
+
+
+def _int(v) -> int | None:
+    try:
+        return int(v) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def to_item(r: dict, units: dict[int, str] | None = None) -> dict:
     """One SuiteQL row -> one items row. NetSuite booleans come back as 'T'/'F'."""
     code = (r.get("itemid") or "").strip()
     display = (r.get("displayname") or "").strip()
     name = display or code or f"Item #{r['id']}"
+    unit_id = _int(r.get("stockunit"))
     return {
         "netsuite_id": int(r["id"]),
         "name": name,
         "sku": code if code and code != name else None,
         "active": r.get("isinactive") != "T",
         "is_lot": r.get("islotitem") == "T",
+        "is_stock": r.get("custitem4") == "T",
+        "unit_id": unit_id,
+        "unit": (units or {}).get(unit_id) if unit_id is not None else None,
     }
 
 
@@ -93,8 +124,9 @@ def _run_locked(engine: Engine, client: SuiteQL | None, requested: str | None, u
     seen = 0
     try:
         client = client or client_from_settings()
+        units = unit_names(client)
         for page in client.by_id(lambda after: ITEM_SQL.format(after=after, since=since)):
-            rows = [to_item(r) for r in page]
+            rows = [to_item(r, units) for r in page]
             stmt = pg_insert(items).values(rows)
             stmt = stmt.on_conflict_do_update(
                 index_elements=[items.c.netsuite_id],
@@ -103,6 +135,10 @@ def _run_locked(engine: Engine, client: SuiteQL | None, requested: str | None, u
                     "sku": stmt.excluded.sku,
                     "active": stmt.excluded.active,
                     "is_lot": stmt.excluded.is_lot,
+                    "is_stock": stmt.excluded.is_stock,
+                    "unit_id": stmt.excluded.unit_id,
+                    # Keep a known label if this run couldn't read unit names.
+                    "unit": func.coalesce(stmt.excluded.unit, items.c.unit),
                     "synced_at": func.now(),
                 },
             )

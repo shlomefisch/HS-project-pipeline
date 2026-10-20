@@ -119,6 +119,9 @@ class Item(Base):
     image_url: Mapped[str | None] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_lot: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_stock: Mapped[bool] = mapped_column(Boolean, default=False)  # NetSuite custitem4
+    unit: Mapped[str | None] = mapped_column(Text)
+    unit_id: Mapped[int | None] = mapped_column(Integer)
     synced_at: Mapped[datetime] = _now()
 
 

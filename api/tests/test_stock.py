@@ -78,6 +78,7 @@ def test_answers_are_cached_for_a_few_minutes():
 
 
 def test_stock_needs_netsuite_connected(client, jay):
+    # (Checking a one-off item is refused too, once connected — covered by the router's is_stock check.)
     assert jay.get("/api/items/11/stock").status_code == 409
 
 
