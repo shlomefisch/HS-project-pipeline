@@ -298,3 +298,6 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .stock-table th { text-align: left; font-weight: 600; color: var(--stone); border-bottom: 1px solid var(--grout); padding: 4px 4px; }
 .stock-table td { padding: 6px 4px; border-bottom: 1px solid var(--grout); }
 .stock-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.stock-place { margin: -4px 0 6px; }
+.stock-table .lot { font-weight: 600; letter-spacing: 0.02em; }
+.stock-table tr.crumb td { color: var(--stone); font-size: 0.85rem; }

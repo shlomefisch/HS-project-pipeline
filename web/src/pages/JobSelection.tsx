@@ -465,8 +465,15 @@ const qtyFmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigit
 
 function StockPanel({ itemId, need }: { itemId: number; need: number | null }) {
   const [fresh, setFresh] = useState(0);
+  const [showCrumbs, setShowCrumbs] = useState(false);
   const { data, error } = useLoad(() => api.get<Stock>(`/items/${itemId}/stock`, fresh ? { fresh: 1 } : undefined), [itemId, fresh]);
   const unit = data?.unit ? ` ${data.unit}` : "";
+  // Leftovers under 1 (a few pieces, a broken box) are real but clutter the answer.
+  const main = data ? data.rows.filter((r) => r.available >= 1 || r.on_hand >= 1) : [];
+  const crumbs = data ? data.rows.filter((r) => r.available < 1 && r.on_hand < 1) : [];
+  const shown = showCrumbs ? [...main, ...crumbs] : main;
+  const places = new Set(data?.rows.map((r) => r.location));
+  const onePlace = places.size === 1 ? [...places][0] : null;
   const bestLot = data?.by_lot ? Math.max(0, ...data.rows.map((r) => r.available)) : null;
   // The job's quantity is in square feet; only compare when NetSuite counts this item in square feet too.
   const sameUnit = !!data?.unit && /^(sf|sq\.? ?ft\.?|sqft|square f)/i.test(data.unit.trim());
@@ -479,14 +486,15 @@ function StockPanel({ itemId, need }: { itemId: number; need: number | null }) {
       </div>
       {!data ? (
         error ? <p className="muted small">{error}</p> : <p className="muted small">Checking NetSuite…</p>
-      ) : data.rows.length === 0 ? (
-        <p className="stock-none">None on hand right now.</p>
+      ) : main.length === 0 ? (
+        <p className="stock-none">None on hand right now{crumbs.length ? " — only leftovers under 1." : "."}</p>
       ) : (
         <>
           <p className="stock-total">
             <span className="stock-free">{qtyFmt(data.totals.available)}{unit}</span> free to sell
             <span className="muted"> · {qtyFmt(data.totals.on_hand)}{unit} on hand</span>
           </p>
+          {onePlace && <p className="muted small stock-place">All at {onePlace}</p>}
           {need != null && bestLot != null && need > 0 && bestLot < need && data.totals.available >= need && (
             <p className="stock-warn">No single lot covers {qtyFmt(need)}{unit} — it would mix lots.</p>
           )}
@@ -495,19 +503,24 @@ function StockPanel({ itemId, need }: { itemId: number; need: number | null }) {
           )}
           <table className="stock-table">
             <thead>
-              <tr><th>Where</th>{data.by_lot && <th>Lot</th>}<th className="num">Free</th><th className="num">On hand</th></tr>
+              <tr>{!onePlace && <th>Where</th>}{data.by_lot && <th>Lot</th>}<th className="num">Free</th><th className="num">On hand</th></tr>
             </thead>
             <tbody>
-              {data.rows.map((r, i) => (
-                <tr key={i}>
-                  <td>{r.location}</td>
-                  {data.by_lot && <td>{r.lot ?? "—"}</td>}
+              {shown.map((r, i) => (
+                <tr key={i} className={r.available < 1 && r.on_hand < 1 ? "crumb" : ""}>
+                  {!onePlace && <td>{r.location}</td>}
+                  {data.by_lot && <td className="lot">{r.lot ?? "—"}</td>}
                   <td className="num">{qtyFmt(r.available)}</td>
                   <td className="num muted">{qtyFmt(r.on_hand)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {crumbs.length > 0 && (
+            <button type="button" className="btn btn-quiet btn-small" onClick={() => setShowCrumbs(!showCrumbs)}>
+              {showCrumbs ? "Hide leftovers" : `+ ${crumbs.length} leftover${crumbs.length === 1 ? "" : "s"} under 1`}
+            </button>
+          )}
         </>
       )}
       {data && <p className="muted small">From NetSuite, {niceTime(data.as_of)}. Free = on hand minus what's already committed to orders.</p>}
