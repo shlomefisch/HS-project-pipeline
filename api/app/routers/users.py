@@ -112,6 +112,10 @@ def update_user(user_id: int, body: UserUpdate, db: Session = Depends(get_db), m
             left.append("the takeoff slot")
         if left:
             raise HTTPException(409, f"{target.name} still holds {', '.join(left)}. Hand them over on the Away or gone screen first.")
+        covering = absences.covering_for_anyone(db, target.id)
+        if covering:
+            names = ", ".join(db.get(User, a.user_id).name for a in covering)
+            raise HTTPException(409, f"{target.name} is the cover while {names} is away. Pick another cover first.")
         absences.release_on_deactivate(db, target.id)
     for k, v in data.items():
         setattr(target, k, v)

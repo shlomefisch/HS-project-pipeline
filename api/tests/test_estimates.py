@@ -78,3 +78,8 @@ def test_discard_frees_the_job_for_a_new_one(jay, job):
     est = jay.post(f"/api/jobs/{job['id']}/estimates", json={"area_ids": [job["kitchen"]["id"]]}).json()
     assert jay.post(f"/api/estimates/{est['id']}/discard").status_code == 200
     assert jay.post(f"/api/jobs/{job['id']}/estimates", json={"area_ids": [job["kitchen"]["id"]]}).status_code == 201
+
+
+def test_a_zero_quantity_is_refused_not_a_crash(jay, job):
+    tag = jay.get(f"/api/jobs/{job['id']}").json()["candidates"][1]["tags"][0]
+    assert jay.patch(f"/api/tags/{tag['id']}", json={"quantity": 0}).status_code == 422

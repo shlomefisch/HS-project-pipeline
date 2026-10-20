@@ -2,9 +2,11 @@
 links, and short-lived links for opening a file on a phone."""
 
 import io
+import ipaddress
 import logging
 import mimetypes
 import re
+import socket
 import threading
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -110,6 +112,46 @@ def direct_url(url: str) -> tuple[str, str]:
     return url.strip(), "web"
 
 
+MAX_REDIRECTS = 6
+
+
+def check_public(url: str) -> None:
+    """Refuses links that point inside our own network (localhost, Railway's private
+    network, link-local addresses) — a pasted link must never make the server fetch those."""
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise NeedsDownload("That isn't a web link.")
+    host = parts.hostname.lower()
+    if host == "localhost" or host.endswith((".internal", ".local", ".localhost")):
+        raise NeedsDownload("That link points inside a private network. Download the file and upload it here.")
+    try:
+        infos = socket.getaddrinfo(host, parts.port or (443 if parts.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise NeedsDownload("Couldn't find that web address. Check the link.") from exc
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global or ip.is_multicast:
+            raise NeedsDownload("That link points inside a private network. Download the file and upload it here.")
+
+
+def _get(http, url: str):
+    """GET that follows redirects by hand, checking every hop is a public address."""
+    for _ in range(MAX_REDIRECTS + 1):
+        check_public(url)
+        resp = http.get(url, stream=True, timeout=TIMEOUT, allow_redirects=False,
+                        headers={"User-Agent": "Mozilla/5.0 (pipeline file fetch)"})
+        if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("Location"):
+            from urllib.parse import urljoin
+
+            url = urljoin(url, resp.headers["Location"])
+            close = getattr(resp, "close", None)
+            if close:
+                close()
+            continue
+        return resp
+    raise NeedsDownload("The link kept redirecting. Download the file and upload it here.")
+
+
 def _filename(resp, url: str) -> str:
     cd = resp.headers.get("Content-Disposition", "")
     m = re.search(r"filename\*=(?:UTF-8|utf-8)''([^;]+)", cd)
@@ -139,8 +181,9 @@ def fetch(url: str, http=None) -> list[tuple[str, str, bytes]]:
 
         http = requests.Session()
     try:
-        resp = http.get(target, stream=True, timeout=TIMEOUT, allow_redirects=True,
-                        headers={"User-Agent": "Mozilla/5.0 (pipeline file fetch)"})
+        resp = _get(http, target)
+    except NeedsDownload:
+        raise
     except Exception as exc:
         raise NeedsDownload(f"Couldn't reach the link ({type(exc).__name__}). Download it and upload the file here.") from exc
     if resp.status_code in (401, 403, 404):

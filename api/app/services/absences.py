@@ -28,13 +28,18 @@ def current(db: Session, user_id: int) -> Absence | None:
 def route(db: Session, user_id: int) -> tuple[int, int | None]:
     """Who actually gets work aimed at user_id: (who, covering_for or None)."""
     a = current(db, user_id)
-    if a is None:
+    if a is None or not _usable(db, a.cover_id):
         return user_id, None
     # A cover who is away themselves passes it on once more — never loops.
     b = current(db, a.cover_id)
-    if b is not None and b.cover_id != user_id:
+    if b is not None and b.cover_id != user_id and _usable(db, b.cover_id):
         return b.cover_id, user_id
     return a.cover_id, user_id
+
+
+def _usable(db: Session, user_id: int) -> bool:
+    u = db.get(User, user_id)
+    return bool(u and u.active and u.role not in ("pending", "viewer"))
 
 
 # ------------------------------------------------------------ holdings
@@ -110,8 +115,10 @@ def end(db: Session, a: Absence) -> None:
     if a.status != "active":
         return
     uid = a.user_id
+    # Whoever holds it now — the cover, or the cover's own cover — it goes home.
+    # (A deliberate hand-over or rep change clears covering_for, so those stay put.)
     for j in db.scalars(select(Job).where(Job.covering_for_id == uid)):
-        if j.rep_id == a.cover_id and j.status in OPEN_JOBS:
+        if j.status in OPEN_JOBS:
             j.rep_id = uid
         j.covering_for_id = None
     for t in db.scalars(select(Task).where(Task.covering_for_id == uid, Task.status.in_(TASK_OPEN))):
@@ -121,7 +128,11 @@ def end(db: Session, a: Absence) -> None:
             v.rep_id, v.covering_for_id = uid, None
     if a.took_takeoff:
         slot = db.get(AppSetting, "takeoff_user_id")
-        if slot and slot.value == str(a.cover_id):
+        chain = {str(a.cover_id)}
+        b = current(db, a.cover_id)
+        if b is not None:
+            chain.add(str(b.cover_id))
+        if slot and slot.value in chain:
             _set_takeoff(db, uid)
     a.status, a.ended_at = "ended", now()
 
@@ -164,6 +175,10 @@ def hand_over(db: Session, user_id: int, to_id: int, what: str, ids: list[int] |
         else:
             x.rep_id, x.covering_for_id = to_id, None
     return len(items)
+
+
+def covering_for_anyone(db: Session, user_id: int) -> list[Absence]:
+    return list(db.scalars(select(Absence).where(Absence.cover_id == user_id, Absence.status.in_(("planned", "active")))))
 
 
 def release_on_deactivate(db: Session, user_id: int) -> None:

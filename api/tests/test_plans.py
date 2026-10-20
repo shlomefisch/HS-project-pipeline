@@ -48,7 +48,41 @@ class Http:
         return self.resp
 
 
-def test_fetch_a_file_and_a_folder():
+def test_links_inside_our_network_are_refused():
+    for bad in ("http://localhost:8000/api/users", "http://127.0.0.1/", "http://10.0.0.5/x", "http://169.254.169.254/latest",
+                "http://postgres.railway.internal:5432/"):
+        try:
+            F.check_public(bad)
+            raise AssertionError(bad)
+        except F.NeedsDownload as exc:
+            assert "private network" in str(exc) or "find" in str(exc)
+
+
+def test_every_redirect_hop_is_checked(monkeypatch):
+    calls = []
+
+    def fake_check(url):
+        calls.append(url)
+        if "169.254" in url:
+            raise F.NeedsDownload("That link points inside a private network.")
+
+    monkeypatch.setattr(F, "check_public", fake_check)
+
+    class Redirect(Resp):
+        def __init__(self):
+            super().__init__(status=302)
+            self.headers["Location"] = "http://169.254.169.254/latest"
+
+    try:
+        F.fetch("https://example.com/plan.pdf", Http(Redirect()))
+        raise AssertionError("should refuse")
+    except F.NeedsDownload:
+        pass
+    assert calls == ["https://example.com/plan.pdf", "http://169.254.169.254/latest"]
+
+
+def test_fetch_a_file_and_a_folder(monkeypatch):
+    monkeypatch.setattr(F, "check_public", lambda url: None)
     got = F.fetch("https://www.dropbox.com/scl/fi/a/k.pdf?dl=0", Http(Resp(cd='attachment; filename="Kitchen plan.pdf"')))
     assert got == [("Kitchen plan.pdf", "application/pdf", b"%PDF-1.4 x")]
     buf = io.BytesIO()
@@ -60,7 +94,8 @@ def test_fetch_a_file_and_a_folder():
     assert [g[0] for g in got] == ["first.pdf", "second.jpg"]
 
 
-def test_a_private_link_says_so():
+def test_a_private_link_says_so(monkeypatch):
+    monkeypatch.setattr(F, "check_public", lambda url: None)
     for resp in (Resp(ctype="text/html"), Resp(status=403)):
         try:
             F.fetch("https://drive.google.com/file/d/1AbCdEfGhIjKlMnOp/view", Http(resp))
@@ -108,6 +143,7 @@ def test_a_private_link_is_marked_needs_download(client, jay):
 
 
 def test_pulling_a_link_fills_it(client, jay, monkeypatch):
+    monkeypatch.setattr(F, "check_public", lambda url: None)
     job = new_job(jay)
     monkeypatch.setattr(F, "pull_link_in_background", lambda file_id: None)
     f = jay.post(f"/api/jobs/{job['id']}/links", json={"url": "https://www.dropbox.com/scl/fi/a/k.pdf?dl=0"}).json()[0]

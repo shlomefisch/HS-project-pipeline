@@ -34,6 +34,8 @@ class FakeNetSuite:
             if not page:
                 return
             yield page
+            if len(page) < 2:  # like SuiteQL: a short page means no more
+                return
             after = int(page[-1]["id"])
 
 
@@ -57,7 +59,7 @@ def test_full_sync_fills_items_and_search_finds_them(client, jay):
     found = jay.get("/api/items", params={"q": "calacatta"}).json()
     assert found[0]["netsuite_id"] == 11 and found[0]["sku"] == "CAL-1224" and found[0]["is_lot"] is True
     assert jay.get("/api/items", params={"q": "CAR-1224"}).json()[0]["name"] == "CAR-1224"
-    assert jay.get("/api/items", params={"q": "old"}).json() == []  # inactive in NetSuite
+    assert jay.get("/api/items", params={"q": "old tile"}).json() == []  # inactive in NetSuite
     assert jay.get("/api/items/resolve", params={"code": "https://x/item/11"}).json()["found"] is True
 
 

@@ -25,7 +25,8 @@ _DUMMY_HASH = hash_password("timing-equalizer")
 
 def _password_version(user: User) -> int:
     # Changing or resetting a password bumps this, which ends every older session.
-    return int(user.password_changed_at.timestamp()) if user.password_changed_at else 0
+    # Microseconds: two changes in the same second must still end the older sessions.
+    return int(user.password_changed_at.timestamp() * 1_000_000) if user.password_changed_at else 0
 
 
 def issue_token(user: User) -> str:
@@ -142,7 +143,10 @@ def current_user(authorization: str | None = Header(default=None), db: Session =
 
 
 def member(user: User = Depends(current_user)) -> User:
-    """Any set-up user. Pending accounts see nothing until an admin assigns a role."""
+    """Any set-up user. Pending accounts see nothing until an admin assigns a role,
+    and someone on a temporary password sees nothing until they pick their own."""
+    if user.must_change_password:
+        raise HTTPException(403, "Pick your own password first.")
     if user.role == "pending" and not user.is_admin:
         raise HTTPException(403, "Your account is waiting for an admin to set your role.")
     return user

@@ -20,22 +20,25 @@ function Root() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [toastMsg, setToastMsg] = useState<{ text: string; kind: string } | null>(null);
 
-  const signOut = useCallback(() => {
-    // Forget this phone first (needs the session), then sign out.
-    forgetThisPhone().finally(() => {
-      setToken(null);
-      setMe(null);
-    });
+  // The session is already dead (a 401): just clear it. Calling the server again would only 401 again.
+  const dropSession = useCallback(() => {
+    setToken(null);
+    setMe(null);
   }, []);
 
+  // The Sign out button: forget this phone for notifications while the session still works, then clear it.
+  const signOut = useCallback(() => {
+    forgetThisPhone().finally(dropSession);
+  }, [dropSession]);
+
   useEffect(() => {
-    setUnauthorizedHandler(signOut);
+    setUnauthorizedHandler(dropSession);
     if (!getToken()) {
       setMe(null);
       return;
     }
     api.get<User>("/auth/me").then(setMe).catch(() => setMe(null));
-  }, [signOut]);
+  }, [dropSession]);
 
   useEffect(() => {
     if (me && me.role !== "pending") api.get<Meta>("/meta").then(setMeta).catch(() => {});

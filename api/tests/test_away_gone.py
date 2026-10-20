@@ -82,3 +82,48 @@ def test_gone_means_hand_over_then_deactivate(boss, jay):
     assert screen["counts"] == {"jobs": 0, "tasks": 0, "visits": 0, "takeoff": 0}
     assert boss.patch(f"/api/users/{jay.id}", json={"active": False}).status_code == 200
     assert jay.get(f"/api/jobs/{b['id']}").status_code == 401  # signed out for good
+
+
+def test_a_cover_who_goes_away_too_still_sends_everything_home(boss, jay, office):
+    """Jay away (Moshe covers), then Moshe away (Office covers). Jay comes back first: all of Jay's work is home."""
+    moshe = make_user(boss, "moshe@hstile.com", "Moshe", "rep")
+    job = new_job(jay)
+    t0 = _today(jay).isoformat()
+    later = (_today(jay) + timedelta(days=5)).isoformat()
+    boss.put("/api/settings", json={"takeoff_user_id": jay.id})
+    boss.post(f"/api/users/{jay.id}/away", json={"cover_id": moshe.id, "starts_on": t0, "ends_on": later})
+    boss.post(f"/api/users/{moshe.id}/away", json={"cover_id": office.id, "starts_on": t0, "ends_on": later})
+    assert jay.get(f"/api/jobs/{job['id']}").json()["rep_id"] == office.id
+    boss.post(f"/api/users/{jay.id}/back")
+    detail = jay.get(f"/api/jobs/{job['id']}").json()
+    assert detail["rep_id"] == jay.id and detail["covering_for_id"] is None
+    assert all(t["assignee_id"] == jay.id for t in detail["tasks"] if t["status"] == "open")
+    assert boss.get("/api/settings").json()["takeoff_user_id"] == jay.id
+
+
+def test_the_cover_cant_be_deactivated_mid_away(boss, jay):
+    moshe = make_user(boss, "moshe@hstile.com", "Moshe", "rep")
+    t0 = _today(jay).isoformat()
+    boss.post(f"/api/users/{jay.id}/away", json={"cover_id": moshe.id, "starts_on": t0, "ends_on": t0})
+    r = boss.patch(f"/api/users/{moshe.id}", json={"active": False})
+    assert r.status_code == 409 and "cover" in r.json()["detail"]
+
+
+def test_reassigning_by_hand_respects_away_and_ends_covering(boss, jay, office):
+    moshe = make_user(boss, "moshe@hstile.com", "Moshe", "rep")
+    job = new_job(jay)
+    t = jay.post(f"/api/jobs/{job['id']}/tasks", json=step(jay.id, "Measure the hall")).json()
+    t0 = _today(jay).isoformat()
+    boss.post(f"/api/users/{office.id}/away", json={"cover_id": moshe.id, "starts_on": t0, "ends_on": t0})
+    r = jay.patch(f"/api/tasks/{t['id']}", json={"assignee_id": office.id}).json()
+    assert r["assignee_id"] == moshe.id and r["covering_for_id"] == office.id
+    r = jay.patch(f"/api/tasks/{t['id']}", json={"assignee_id": jay.id}).json()
+    assert r["assignee_id"] == jay.id and r["covering_for_id"] is None
+
+
+def test_temporary_password_people_must_pick_their_own_first(client, boss):
+    boss.post("/api/users", json={"email": "dina@hstile.com", "name": "Dina", "role": "rep", "password": "temp-pass-1"})
+    tok = client.post("/api/auth/login", json={"email": "dina@hstile.com", "password": "temp-pass-1"}).json()["token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    assert client.get("/api/jobs", headers=h).status_code == 403
+    assert client.get("/api/auth/me", headers=h).status_code == 200

@@ -45,6 +45,12 @@ def update_task(task_id: int, body: TaskUpdate, db: Session = Depends(get_db), _
         raise HTTPException(422, "A task can't lose its due date.")
     if "assignee_id" in data and data["assignee_id"] is None:
         raise HTTPException(422, "A task can't lose its assignee.")
+    if data.get("assignee_id") is not None:
+        # A hand reassignment is deliberate: it ends any "covering for", and still
+        # respects whoever is away now.
+        from ..services.absences import route
+
+        data["assignee_id"], data["covering_for_id"] = route(db, data["assignee_id"])
     for k, v in data.items():
         setattr(t, k, v)
     db.commit()

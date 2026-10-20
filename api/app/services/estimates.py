@@ -91,6 +91,11 @@ def warnings(db: Session, est: Estimate, lines: list[EstimateLine]) -> list[str]
         if tag and tag.avail_status not in GOOD:
             state = {"two_lots": "two lots only", "short": "short", None: "not checked"}.get(tag.avail_status, tag.avail_status)
             out.append(f"{ln.description}: availability {state}.")
+        elif tag and tag.avail_status == "available" and tag.avail_need is not None:
+            area = db.get(Area, tag.area_id)
+            need = need_for(tag, area) if area else None
+            if need is not None and Decimal(need) != Decimal(tag.avail_need):
+                out.append(f"{ln.description}: availability was checked for {float(tag.avail_need):,.0f}, it now needs {float(need):,.0f} — check again.")
         if ln.quantity is None:
             out.append(f"{ln.description}: no quantity — counted in {ln.unit}, enter it.")
         if ln.price is None:

@@ -266,13 +266,13 @@ class CandidateUpdate(_In):
 
 class TagCreate(_In):
     area_id: int
-    quantity: Decimal | None = Field(default=None, ge=0)
+    quantity: Decimal | None = Field(default=None, gt=0)
 
 
 class TagUpdate(_In):
     status: Literal["considering", "chosen", "declined"] | None = None
     reason: str | None = None
-    quantity: Decimal | None = Field(default=None, ge=0)
+    quantity: Decimal | None = Field(default=None, gt=0)  # empty clears it; zero is never a real quantity
 
     _s = field_validator("reason", mode="before")(_strip)
 
