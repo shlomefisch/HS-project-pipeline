@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, setToken } from "../api";
 import { ErrorLine, Field, Sheet, useAction } from "../ui";
+import { Logo } from "../icons";
 import type { User } from "../types";
 
 interface Config {
@@ -26,14 +27,7 @@ declare global {
 type SignedIn = { token: string; user: User };
 
 function Mark() {
-  return (
-    <div className="login-mark" aria-hidden="true">
-      <span />
-      <span />
-      <span />
-      <span className="glaze" />
-    </div>
-  );
+  return <Logo width={180} className="login-logo" />;
 }
 
 export function Login({ onSignedIn }: { onSignedIn: (u: User) => void }) {
@@ -84,7 +78,7 @@ export function Login({ onSignedIn }: { onSignedIn: (u: User) => void }) {
     <main className="login">
       <Mark />
       <h1>Pipeline</h1>
-      <p className="lead">Every job, its next step, and who is doing it.</p>
+      <p className="lead">Every job, its next step, and who's on it.</p>
 
       <form
         className="pw-login"

@@ -83,3 +83,13 @@ def test_discard_frees_the_job_for_a_new_one(jay, job):
 def test_a_zero_quantity_is_refused_not_a_crash(jay, job):
     tag = jay.get(f"/api/jobs/{job['id']}").json()["candidates"][1]["tags"][0]
     assert jay.patch(f"/api/tags/{tag['id']}", json={"quantity": 0}).status_code == 422
+
+
+def test_progress_fills_from_the_left(jay, job):
+    p = jay.get(f"/api/jobs/{job['id']}").json()["progress"]
+    assert [s["done"] for s in p["stages"]] == [True, True, False, False, False, False]  # chosen tiles, no footage yet
+    assert p["current"] == "Footage"
+    _footage(jay, job["kitchen"], 100)
+    _footage(jay, job["mud"], 80)
+    p = jay.get("/api/jobs", params={"mine": 1}).json()[0]["progress"]
+    assert p["done"] == 3 and p["current"] == "Availability"

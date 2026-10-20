@@ -173,6 +173,7 @@ export interface JobSummary {
   default_contact: Entity | null;
   open_tasks: number;
   open_takeoff_id?: number | null;
+  progress?: Progress | null;
   next_due: string | null;
   stuck: boolean;
 }
@@ -347,4 +348,10 @@ export interface TemplateList {
   triggers: Record<string, string>;
   playbooks: Record<string, string>;
   assignee_kinds: Record<string, string>;
+}
+
+export interface Progress {
+  stages: { key: string; label: string; done: boolean }[];
+  done: number;
+  current: string;
 }

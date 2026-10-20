@@ -25,6 +25,7 @@ from ..rules.normalize import norm_name
 from ..schemas import JobCreate, JobHold, JobLose, JobRevive, JobUpdate, NextStep, PersonOnJob, RepChange
 from ..serialize import entity_out, row, user_out
 from ..services.jobs import add_role, check_fields, check_rep, get_job, live_entity
+from ..services.progress import for_jobs as job_progress
 from ..services.tasks import create_task
 from ..timeutil import now, today
 
@@ -51,9 +52,11 @@ def _summaries(db: Session, jobs: list[Job]) -> list[dict]:
     reps = {u.id: u for u in db.scalars(select(User).where(User.id.in_(list({j.rep_id for j in jobs}))))}
     contact_ids = {j.default_contact_id for j in jobs if j.default_contact_id}
     contacts = {e.id: e for e in db.scalars(select(Entity).where(Entity.id.in_(list(contact_ids))))} if contact_ids else {}
+    progress = job_progress(db, ids)
     out = []
     for j in jobs:
         d = row(j)
+        d["progress"] = progress.get(j.id)
         d["rep"] = user_out(reps.get(j.rep_id))
         d["default_contact"] = entity_out(contacts.get(j.default_contact_id)) if j.default_contact_id else None
         d["open_tasks"] = open_counts.get(j.id, 0)
@@ -209,6 +212,7 @@ def job_detail(db: Session, job: Job) -> dict:
             "visits": [row(v) for v in visits],
             "open_tasks": len(open_tasks),
             "open_takeoff_id": next((t.id for t in open_tasks if t.kind == "takeoff"), None),
+            "progress": job_progress(db, [job.id])[job.id],
             "stuck": job.status == "active" and not open_tasks,
         }
     )

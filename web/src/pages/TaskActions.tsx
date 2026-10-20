@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { celebrateHere } from "../celebrate";
 import { api } from "../api";
 import { niceDate, useApp } from "../state";
 import { blankStep, ErrorLine, Field, NextStepFields, Sheet, useAction } from "../ui";
@@ -71,7 +72,10 @@ export function CompleteTask({ task, onClose, onDone }: { task: Task; onClose: (
           onClick={() =>
             run(async () => {
               await api.post(`/tasks/${task.id}/complete`, { outcome, note: note || null, next_step: withStep ? step : null });
-              toast(outcome === "blocked" ? "Marked blocked" : "Saved");
+              if (outcome === "done") {
+                celebrateHere();
+                toast(task.job_name ? `Done — ${task.job_name} moves on` : "Done");
+              } else toast(outcome === "blocked" ? "Marked blocked" : "Saved");
               onDone();
             })
           }

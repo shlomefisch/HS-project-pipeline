@@ -11,6 +11,7 @@ import { CompleteTask } from "./TaskActions";
 
 interface RepView {
   today: string;
+  done_today?: number;
   went_wrong: Task[];
   visits_today: Visit[];
   due: Task[];
@@ -20,6 +21,7 @@ interface RepView {
 
 interface OfficeView {
   tasks: Task[];
+  done_today?: number;
   counts: { tasks: number; overdue: number };
 }
 
@@ -31,8 +33,11 @@ export function Today({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: Us
   const [view, setView] = useState<"rep" | "office" | "overview">(me.role === "rep" ? "rep" : boss ? "overview" : "office");
   return (
     <main className="page">
-      <header className="page-head">
-        <h1>Today</h1>
+      <header className="page-head today-head">
+        <div>
+          <h1 className="greeting">{greeting()}, {firstName(me.name || me.email)}</h1>
+          <p className="today-date">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
+        </div>
         <div className="seg" role="tablist">
           <button role="tab" aria-selected={view === "rep"} className={view === "rep" ? "on" : ""} onClick={() => setView("rep")}>
             My jobs
@@ -80,6 +85,28 @@ export function Today({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: Us
   );
 }
 
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+function firstName(name: string): string {
+  return name.replace(/@.*/, "").split(/[\s.]+/)[0] || name;
+}
+
+/** The small win: what you finished today, laid as tiles. */
+function DoneToday({ n }: { n: number }) {
+  if (!n) return <p className="done-today done-none">Nothing finished yet today — the first one is the best one.</p>;
+  return (
+    <p className="done-today">
+      <span className="done-tiles" aria-hidden="true">
+        {Array.from({ length: Math.min(n, 12) }, (_, i) => <span key={i} />)}
+      </span>
+      <span>You've finished <strong>{n}</strong> step{n === 1 ? "" : "s"} today.</span>
+    </p>
+  );
+}
+
 function Tile({ n, label, tone, onClick }: { n: number; label: string; tone: string; onClick: () => void }) {
   return (
     <button role="listitem" onClick={onClick} className={`tile ${tone ? `tile-${tone}` : ""}`}>
@@ -101,6 +128,7 @@ function RepDashboard() {
   const c = data.counts;
   return (
     <>
+      <DoneToday n={data.done_today ?? 0} />
       <div className="tiles" role="list">
         <Tile n={c.went_wrong} label="went wrong" tone={c.went_wrong ? "alert" : ""} onClick={() => jump("wrong")} />
         <Tile n={c.visits_today} label="visits today" tone="" onClick={() => jump("visits")} />
@@ -229,11 +257,12 @@ function OfficeDashboard() {
   if (!data) return <Loading error={error} />;
   return (
     <section className="section">
+      <DoneToday n={data.done_today ?? 0} />
       <p className="muted">
         {data.counts.tasks} open{data.counts.overdue ? `, ${data.counts.overdue} overdue` : ""}
       </p>
       {data.tasks.length === 0 ? (
-        <Empty>Your list is clear.</Empty>
+        <Empty>Your list is clear. Nice work.</Empty>
       ) : (
         <ul className="list">
           {data.tasks.map((t) => (

@@ -4,6 +4,8 @@ import { niceDate, niceTime, useApp, useLoad } from "../state";
 import { Empty, EntityPicker, Loading, Sheet, STATUS_LABEL, useAction, ErrorLine, Field } from "../ui";
 import type { AuditEntry, Job, Task, Visit } from "../types";
 import { CompleteTask } from "./TaskActions";
+import { ProgressTiles } from "../progress";
+import { Icon } from "../icons";
 import { Selection } from "./JobSelection";
 import { Plans } from "./JobPlans";
 import { EstimateTab } from "./JobEstimate";
@@ -37,6 +39,7 @@ export function JobPage({ id }: { id: number }) {
           Jobs
         </a>
         <h1>{job.name}</h1>
+        <ProgressTiles progress={job.progress} size="large" />
         <p className="muted">
           {[job.address && job.address !== job.name ? job.address : null, job.class_code, `Rep: ${userName(job.rep_id)}`, contact ? `Contact: ${contact.name}` : null]
             .filter(Boolean)
@@ -76,6 +79,8 @@ export function JobPage({ id }: { id: number }) {
         </div>
       )}
 
+      <div className="job-body">
+      <div className="job-main">
       <nav className="tabs" role="tablist">
         {(
           [
@@ -99,6 +104,9 @@ export function JobPage({ id }: { id: number }) {
       {tab === "steps" && <Steps job={job} reload={reload} onLogVisit={(v) => { setLogVisit(v); setSheet("log"); }} />}
       {tab === "people" && <People job={job} reload={reload} />}
       {tab === "story" && <Story jobId={job.id} />}
+      </div>
+      <JobRail job={job} onSteps={() => setTab("steps")} />
+      </div>
 
       {sheet === "log" && <LogEvent job={job} visit={logVisit} onClose={close} onDone={done} />}
       {sheet === "schedule" && <ScheduleVisit job={job} onClose={close} onDone={done} />}
@@ -315,4 +323,62 @@ function describe(e: AuditEntry): string {
     .map(([k, [from, to]]) => `${k.replace(/_/g, " ")}: ${from ?? "—"} → ${to ?? "—"}`)
     .join("; ");
   return `${table}: ${fields}`;
+}
+
+// ------------------------------------------- the side panel, on wide screens
+function JobRail({ job, onSteps }: { job: Job; onSteps: () => void }) {
+  const { userName, meta } = useApp();
+  const open = job.tasks.filter((t) => t.status === "open" || t.status === "blocked");
+  const upcoming = job.visits.filter((v) => v.status === "scheduled");
+  const people = job.roles.filter((r) => r.active);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  return (
+    <aside className="job-rail" aria-label="At a glance">
+      <section>
+        <h3>Next steps</h3>
+        {open.length === 0 ? (
+          <p className="rail-empty">Nothing open — add the next step.</p>
+        ) : (
+          <ul>
+            {open.slice(0, 6).map((t) => (
+              <li key={t.id}>
+                <button className={`rail-item ${t.status === "blocked" ? "rail-bad" : t.due_date < todayIso ? "rail-late" : ""}`} onClick={onSteps}>
+                  <strong>{t.title}</strong>
+                  <span>{userName(t.assignee_id)} · {t.status === "blocked" ? "blocked" : niceDate(t.due_date)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {upcoming.length > 0 && (
+        <section>
+          <h3>Visits</h3>
+          <ul>
+            {upcoming.slice(0, 3).map((v) => (
+              <li key={v.id} className="rail-line">{niceDate(v.starts_at)}, {niceTime(v.starts_at)} — {v.kind === "site" ? "site visit" : `${v.showroom ?? ""} showroom`}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <section>
+        <h3>People</h3>
+        <ul>
+          {people.map((r) => (
+            <li key={r.id} className="rail-person">
+              <a href={`#/people/${r.entity.id}`}>
+                <strong>{r.entity.name}</strong>
+                <span>{meta.role_labels[r.role] ?? r.role}{job.default_contact_id === r.entity.id ? " · contact" : ""}</span>
+              </a>
+              {r.entity.phone && (
+                <a className="icon-btn" href={`tel:${r.entity.phone}`} aria-label={`Call ${r.entity.name}`} title={r.entity.phone}>
+                  <Icon name="phone" size={18} />
+                </a>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </aside>
+  );
 }

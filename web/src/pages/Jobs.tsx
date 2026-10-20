@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { Icon } from "../icons";
+import { ProgressTiles } from "../progress";
 import { api } from "../api";
 import { go, niceDate, useApp, useLoad } from "../state";
 import { blankStep, Empty, EntityPicker, ErrorLine, Field, Loading, NextStepFields, Sheet, STATUS_LABEL, UserSelect, useAction } from "../ui";
 import type { Entity, Job, JobSummary, NextStep } from "../types";
 
-export function Jobs() {
+export function Jobs({ compact = false, selectedId = null }: { compact?: boolean; selectedId?: number | null } = {}) {
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
   const [mine, setMine] = useState(true);
@@ -15,14 +17,20 @@ export function Jobs() {
   const { data, error } = useLoad(() => api.get<JobSummary[]>("/jobs", { q: debounced, mine: mine && !debounced ? 1 : undefined }), [debounced, mine]);
 
   return (
-    <main className="page">
+    <main className={compact ? "jobs-pane" : "page"}>
       <header className="page-head">
         <h1>Jobs</h1>
-        <button className="btn btn-primary" onClick={() => go("jobs/new")}>
-          New job
-        </button>
+        {!compact && (
+          <button className="btn btn-primary" onClick={() => go("jobs/new")}>
+            New job
+          </button>
+        )}
       </header>
-      <input className="search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Job, address, person or phone" aria-label="Search jobs" />
+      <div className="search-box">
+        <Icon name="search" />
+        <input id="job-search" className="search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Job, address, person or phone" aria-label="Search jobs" />
+        {compact && <kbd>/</kbd>}
+      </div>
       {!debounced && (
         <div className="seg" role="tablist">
           <button role="tab" aria-selected={mine} className={mine ? "on" : ""} onClick={() => setMine(true)}>
@@ -40,9 +48,12 @@ export function Jobs() {
       ) : (
         <ul className="list">
           {data.map((j) => (
-            <li key={j.id} className={j.stuck ? "task-alert" : ""}>
-              <a href={`#/jobs/${j.id}`} className="row-link">
-                <strong>{j.name}</strong>
+            <li key={j.id} className={`job-row ${j.stuck ? "task-alert" : ""} ${selectedId === j.id ? "job-row-on" : ""}`}>
+              <a href={`#/jobs/${j.id}`} className="row-link" aria-current={selectedId === j.id ? "page" : undefined}>
+                <span className="job-row-top">
+                  <strong>{j.name}</strong>
+                  <ProgressTiles progress={j.progress} />
+                </span>
                 <span className="muted">
                   {j.status !== "active" ? `${STATUS_LABEL[j.status]} — ` : ""}
                   {j.default_contact?.name ?? ""}

@@ -1,7 +1,7 @@
 """Each role's first screen."""
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import exists, or_, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..auth import member
@@ -71,6 +71,9 @@ def rep_view(rep_id: int | None = None, db: Session = Depends(get_db), user: Use
             "jobs": [row(j) for j in stuck_jobs],
             "missed_visits": [{**row(v), "job_name": j.name} for v, j in missed_visits],
         },
+        "done_today": db.scalar(
+            select(func.count()).select_from(Task).where(Task.completed_by == rid, Task.completed_at >= start, Task.completed_at < end)
+        ) or 0,
         "counts": {
             "went_wrong": len(went_wrong),
             "visits_today": len(visits),
@@ -90,7 +93,11 @@ def office_view(db: Session = Depends(get_db), user: User = Depends(member)):
     ).all()
     t0 = today().isoformat()
     tasks = [{**d, "overdue": d["due_date"] < t0} for d in _with_job(rows)]
-    return {"today": t0, "tasks": tasks, "counts": {"tasks": len(tasks), "overdue": sum(1 for t in tasks if t["overdue"])}}
+    start, end = day_bounds(today())
+    done_today = db.scalar(
+        select(func.count()).select_from(Task).where(Task.completed_by == user.id, Task.completed_at >= start, Task.completed_at < end)
+    ) or 0
+    return {"today": t0, "tasks": tasks, "done_today": done_today, "counts": {"tasks": len(tasks), "overdue": sum(1 for t in tasks if t["overdue"])}}
 
 
 # ---------------------------------------------------------- management
