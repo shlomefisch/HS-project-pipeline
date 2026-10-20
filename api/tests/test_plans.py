@@ -153,15 +153,13 @@ def test_pulling_a_link_fills_it(client, jay, monkeypatch):
     assert f["status"] == "ready" and f["name"] == "Kitchen.pdf" and f["url"]
 
 
-def test_footage_needs_its_source_and_lands_in_the_story(client, jay):
+def test_area_size_is_just_a_number_and_lands_in_the_story(client, jay):
     job = new_job(jay)
     area = jay.post(f"/api/jobs/{job['id']}/areas", json={"name": "Kitchen"}).json()
-    assert jay.put(f"/api/areas/{area['id']}/footage", json={"footage": 420}).status_code == 422
-    assert jay.put(f"/api/areas/{area['id']}/footage", json={"footage": 420, "source": "designer", "confidence": "approximate"}).status_code == 422
-    r = jay.put(f"/api/areas/{area['id']}/footage", json={"footage": 420, "source": "designer", "by": "Rifky", "confidence": "approximate"})
+    r = jay.put(f"/api/areas/{area['id']}/footage", json={"footage": 420})
     assert r.status_code == 200 and r.json()["footage"] == 420.0
     story = [e["summary"] for e in jay.get(f"/api/jobs/{job['id']}/timeline").json()]
-    assert "Kitchen footage: 420 sf, approximate — from designer (Rifky)" in story
+    assert "Kitchen size: 420 sf — starts its tiles" in story
     assert jay.put(f"/api/areas/{area['id']}/footage", json={"footage": None}).json()["footage"] is None
 
 
@@ -177,17 +175,17 @@ def test_takeoff_needs_plans_a_person_and_is_one_per_job(client, boss, jay, offi
     assert jay.get(f"/api/jobs/{job['id']}").json()["open_takeoff_id"] == r.json()["id"]
 
 
-def test_takeoff_is_not_done_until_every_area_has_footage(client, boss, jay, office):
+def test_takeoff_is_not_done_until_every_area_is_measured(client, boss, jay, office):
     job = new_job(jay)
     _upload(jay, job["id"])
     kitchen = jay.post(f"/api/jobs/{job['id']}/areas", json={"name": "Kitchen"}).json()
     jay.post(f"/api/jobs/{job['id']}/areas", json={"name": "Mudroom"})
     t = jay.post(f"/api/jobs/{job['id']}/takeoff", json={"assignee_id": office.id}).json()
-    office.put(f"/api/areas/{kitchen['id']}/footage", json={"footage": 300, "source": "takeoff", "confidence": "confirmed"})
+    office.put(f"/api/areas/{kitchen['id']}/footage", json={"footage": 300})
     r = office.post(f"/api/tasks/{t['id']}/complete", json={"outcome": "done", "next_step": step(jay.id, "Price it")})
     assert r.status_code == 422 and "Mudroom" in r.json()["detail"]
     mud = [a for a in jay.get(f"/api/jobs/{job['id']}").json()["areas"] if a["name"] == "Mudroom"][0]
-    office.put(f"/api/areas/{mud['id']}/footage", json={"footage": 80, "source": "takeoff", "confidence": "confirmed"})
+    office.put(f"/api/areas/{mud['id']}/footage", json={"footage": 80})
     r = office.post(f"/api/tasks/{t['id']}/complete", json={"outcome": "done", "next_step": step(jay.id, "Price it")})
     assert r.status_code == 200
     assert mud["name"] == "Mudroom"

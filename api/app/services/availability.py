@@ -38,11 +38,33 @@ def _parts(db: Session, tag: CandidateTag) -> tuple[Job, Area, Candidate, str]:
     return job, area, cand, name
 
 
-def need_for(tag: CandidateTag, area: Area) -> Decimal | None:
-    """What this tile has to cover in this area: its own quantity, else the area's footage."""
-    if tag.quantity:
-        return tag.quantity
-    return area.footage
+def need_for(tag: CandidateTag, area: Area | None = None) -> Decimal | None:
+    """What this tile has to cover in this area. The number on the tile is the boss;
+    the area's number only ever fills in an empty tile when it's chosen."""
+    return tag.quantity
+
+
+def tile_unit(db: Session, cand: Candidate) -> str:
+    """How the tile is counted: the item's NetSuite unit for our stock, square feet otherwise."""
+    item = db.get(Item, cand.netsuite_item_id) if cand.source == "stock" and cand.netsuite_item_id else None
+    return item.unit if item is not None and item.unit else "SF"
+
+
+def in_square_feet(unit: str | None) -> bool:
+    return bool(SQFT.match((unit or "SF").strip()))
+
+
+def fill_from_area(db: Session, tag: CandidateTag) -> None:
+    """A chosen tile with no number of its own starts from the area's number.
+    Never over a number someone typed, and never for tiles counted by the piece."""
+    if tag.status != "chosen" or tag.quantity is not None:
+        return
+    area = db.get(Area, tag.area_id)
+    cand = db.get(Candidate, tag.candidate_id)
+    if area is None or cand is None or area.footage is None:
+        return
+    if in_square_feet(tile_unit(db, cand)):
+        tag.quantity = area.footage
 
 
 def _tell_rep(db: Session, job: Job, area: Area, tile: str, why: str, by: User) -> None:
@@ -71,7 +93,7 @@ def check_stock(db: Session, tag: CandidateTag, by: User, fetch_stock: Callable[
         raise HTTPException(422, "Only our own stock can be checked here — confirm local or overseas tiles instead.")
     need = need_for(tag, area)
     if not need:
-        raise HTTPException(422, f"{area.name} has no footage yet, and this tile has no quantity. Enter one first.")
+        raise HTTPException(422, f"{tile} for {area.name} has no footage yet. Enter it on the tile first.")
     item = db.get(Item, cand.netsuite_item_id)
     if item is not None and item.unit and not SQFT.match(item.unit.strip()):
         raise HTTPException(

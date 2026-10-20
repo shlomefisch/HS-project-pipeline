@@ -3,9 +3,9 @@ import { api } from "../api";
 import { niceDate, niceTime, plusDays, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Sheet, UserSelect, useAction } from "../ui";
 import type { AppSettings, Area, Candidate, Job, JobFile, Tag } from "../types";
+import { chosenTiles, inSqft, num, unitOf, unitShort } from "../footage";
 
 const KIND_LABEL: Record<JobFile["kind"], string> = { plan: "Plans", photo: "Photos", note: "Notes", other: "Other" };
-const SOURCE_LABEL: Record<string, string> = { customer: "Customer", designer: "Designer", installer: "Installer", takeoff: "Our takeoff" };
 
 const sf = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 const size = (b: number | null) => (b == null ? "" : b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
@@ -25,8 +25,9 @@ export function Plans({ job, reload }: { job: Job; reload: () => void }) {
   }, [fetching, filesReload]);
 
   const live = job.areas.filter((a) => a.status === "open" || a.status === "decided");
-  const missing = live.filter((a) => a.footage == null);
-  const total = live.reduce((n, a) => n + (a.footage ?? 0), 0);
+  const tiles = live.flatMap((a) => chosenTiles(job, a.id));
+  const missing = tiles.filter(({ t }) => t.quantity == null).length;
+  const total = tiles.reduce((n, { c, t }) => n + (inSqft(unitOf(c)) ? t.quantity ?? 0 : 0), 0);
   const plans = (files.data ?? []).filter((f) => f.kind === "plan" && f.status === "ready" && (f.url || f.source === "link"));
   const done = () => {
     setSheet(null);
@@ -40,30 +41,34 @@ export function Plans({ job, reload }: { job: Job; reload: () => void }) {
       <section className="section">
         <div className="section-head">
           <h2>Footage</h2>
-          {live.length > 0 && <span className="muted small">{missing.length ? `${missing.length} area${missing.length === 1 ? " still needs" : "s still need"} a number` : `${sf(total)} sf in all`}</span>}
+          {tiles.length > 0 && <span className="muted small">{missing ? `${missing} tile${missing === 1 ? " still needs" : "s still need"} a number` : `${num(total)} sf in all`}</span>}
         </div>
-        <p className="muted small">One number per area, waste included. No number, no estimate — an approximate one is fine.</p>
+        <p className="muted small">The number on each tile is the footage, waste included. The area size is only where a newly chosen tile starts.</p>
         {live.length === 0 ? (
           <Empty>Add the areas on the Selection tab first.</Empty>
         ) : (
-          <ul className="list">
-            {live.map((a) => (
-              <li key={a.id}>
-                <button className="row-btn footage-row" onClick={() => setSheet({ area: a })}>
-                  <strong>{a.name}</strong>
-                  {a.footage == null ? (
-                    <span className="footage-missing">No footage yet</span>
+          <div className="footage-areas">
+            {live.map((a) => {
+              const here = chosenTiles(job, a.id);
+              return (
+                <div key={a.id} className="footage-area">
+                  <div className="footage-area-head">
+                    <strong>{a.name}</strong>
+                    <button className="btn btn-quiet btn-small" onClick={() => setSheet({ area: a })}>
+                      {a.footage == null ? "Set area size" : `Area size ${num(a.footage)} sf`}
+                    </button>
+                  </div>
+                  {here.length === 0 ? (
+                    <p className="muted small footage-none">No tile chosen yet — it will start at the area size.</p>
                   ) : (
-                    <span>
-                      <span className="footage-num">{sf(a.footage)} sf</span>{" "}
-                      <span className={`pill ${a.footage_confidence === "confirmed" ? "pill-ok" : "pill-warn"}`}>{a.footage_confidence}</span>
-                      <span className="muted small"> — {SOURCE_LABEL[a.footage_source ?? ""] ?? a.footage_source}{a.footage_by ? `, ${a.footage_by}` : ""}</span>
-                    </span>
+                    <ul className="list">
+                      {here.map(({ c, t }) => <TileNumber key={t.id} cand={c} tag={t} onSaved={reload} />)}
+                    </ul>
                   )}
-                </button>
-              </li>
-            ))}
-          </ul>
+                </div>
+              );
+            })}
+          </div>
         )}
       </section>
 
@@ -124,7 +129,7 @@ function TakeoffStatus({ job }: { job: Job }) {
       <strong>{userName(t.assignee_id)}</strong> is on it — due {niceDate(t.due_date)}
       {t.status === "blocked" && <span className="pill pill-warn"> blocked: {t.outcome_note}</span>}
       <br />
-      <span className="muted small">It closes once every area has its footage. Finish it from the Steps tab.</span>
+      <span className="muted small">It closes once every chosen tile has its number (or, before tiles are chosen, every area has its size). Finish it from the Steps tab.</span>
     </p>
   );
 }
@@ -282,41 +287,44 @@ function LinkSheet({ job, onClose, onDone }: { job: Job; onClose: () => void; on
 }
 
 // ------------------------------------------------------------ footage
-function FootageSheet({ job, area, onClose, onDone }: { job: Job; area: Area; onClose: () => void; onDone: () => void }) {
-  const { me } = useApp();
-  const [footage, setFootage] = useState(area.footage != null ? String(area.footage) : "");
-  const [source, setSource] = useState<string>(area.footage_source ?? "");
-  const [by, setBy] = useState(area.footage_by ?? "");
-  const [confidence, setConfidence] = useState<string>(area.footage_confidence ?? "approximate");
+/** The footage itself: typed straight on the tile, saved when you leave the box. */
+function TileNumber({ cand, tag, onSaved }: { cand: Candidate; tag: Tag; onSaved: () => void }) {
+  const unit = unitShort(unitOf(cand));
+  const saved = tag.quantity != null ? String(tag.quantity) : "";
+  const [value, setValue] = useState(saved);
   const { busy, error, run } = useAction();
-  // Suggest the people on the job for "who said it".
-  const suggest = (s: string) => {
-    if (s === "takeoff") return me.name;
-    const role = job.roles.find((r) => r.active && (s === "customer" ? r.role === "owner" : r.role === s));
-    return role?.entity.name ?? "";
+  useEffect(() => setValue(saved), [saved]);
+  const save = () => {
+    if (value === saved || busy) return;
+    run(async () => { await api.patch(`/tags/${tag.id}`, { quantity: value ? Number(value) : null }); onSaved(); });
   };
   return (
-    <Sheet title={`${area.name} — footage`} onClose={onClose}>
-      <Field label="Square feet, waste included">
+    <li className="tile-number">
+      <span className="tile-number-name">{cand.display_name}</span>
+      <label className={`tile-number-box ${value ? "" : "tile-number-empty"}`}>
+        <input
+          inputMode="decimal"
+          aria-label={`${cand.display_name} footage`}
+          value={value}
+          onChange={(e) => setValue(e.target.value.replace(/[^\d.]/g, ""))}
+          onBlur={save}
+          onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+        />
+        <span>{unit}</span>
+      </label>
+      <ErrorLine error={error} />
+    </li>
+  );
+}
+
+/** The area's size: only where newly chosen tiles start. It fills tiles that have no number, never over one. */
+function FootageSheet({ area, onClose, onDone }: { job: Job; area: Area; onClose: () => void; onDone: () => void }) {
+  const [footage, setFootage] = useState(area.footage != null ? String(area.footage) : "");
+  const { busy, error, run } = useAction();
+  return (
+    <Sheet title={`${area.name} — area size`} onClose={onClose}>
+      <Field label="Square feet, waste included" hint="Chosen tiles in this area that have no number yet start from it. A tile's own number is never changed.">
         <input inputMode="decimal" autoFocus value={footage} onChange={(e) => setFootage(e.target.value.replace(/[^\d.]/g, ""))} />
-      </Field>
-      <Field label="Where the number came from">
-        <div className="chips">
-          {Object.entries(SOURCE_LABEL).map(([k, v]) => (
-            <button key={k} type="button" className={`chip ${source === k ? "chip-on" : ""}`} onClick={() => { setSource(k); if (!by) setBy(suggest(k)); }}>
-              {v}
-            </button>
-          ))}
-        </div>
-      </Field>
-      <Field label="Who said it">
-        <input value={by} onChange={(e) => setBy(e.target.value)} />
-      </Field>
-      <Field label="How sure">
-        <div className="chips">
-          <button type="button" className={`chip ${confidence === "approximate" ? "chip-on" : ""}`} onClick={() => setConfidence("approximate")}>Approximate</button>
-          <button type="button" className={`chip ${confidence === "confirmed" ? "chip-on" : ""}`} onClick={() => setConfidence("confirmed")}>Confirmed</button>
-        </div>
       </Field>
       <ErrorLine error={error} />
       <div className="actions">
@@ -325,8 +333,8 @@ function FootageSheet({ job, area, onClose, onDone }: { job: Job; area: Area; on
         )}
         <button
           className="btn btn-primary"
-          disabled={busy || !footage || Number(footage) <= 0 || !source}
-          onClick={() => run(async () => { await api.put(`/areas/${area.id}/footage`, { footage: Number(footage), source, by: by || null, confidence }); onDone(); })}
+          disabled={busy || !footage || Number(footage) <= 0}
+          onClick={() => run(async () => { await api.put(`/areas/${area.id}/footage`, { footage: Number(footage) }); onDone(); })}
         >
           Save
         </button>
@@ -397,7 +405,7 @@ function Availability({ job, reload }: { job: Job; reload: () => void }) {
       ) : (
         <ul className="list">
           {lines.map(({ c, t, a }) => {
-            const need = t.quantity ?? a.footage;
+            const need = t.quantity;
             const stale = t.avail_status && c.source === "stock" && t.avail_need != null && need != null && Number(t.avail_need) !== Number(need);
             const st = t.avail_status ? AVAIL[t.avail_status] : null;
             return (
@@ -405,7 +413,7 @@ function Availability({ job, reload }: { job: Job; reload: () => void }) {
                 <div className="avail-main">
                   <strong>{c.display_name}</strong>
                   <span className="muted small">
-                    {a.name}{need != null ? ` · needs ${sf(need)} sf` : " · no footage yet"} · {c.source === "stock" ? "our stock" : c.source === "local" ? `local${c.supplier ? `, ${c.supplier}` : ""}` : `overseas${c.supplier ? `, ${c.supplier}` : ""}`}
+                    {a.name}{need != null ? ` · needs ${sf(need)} ${unitShort(unitOf(c))}` : " · no footage on the tile yet"} · {c.source === "stock" ? "our stock" : c.source === "local" ? `local${c.supplier ? `, ${c.supplier}` : ""}` : `overseas${c.supplier ? `, ${c.supplier}` : ""}`}
                   </span>
                   {st && <span><span className={`pill ${st.cls}`}>{st.label}</span>{t.avail_lot && <span className="muted small"> lot {t.avail_lot}</span>}{t.avail_checked_at && <span className="muted small"> · {niceDate(t.avail_checked_at)} {niceTime(t.avail_checked_at)}</span>}</span>}
                   {t.avail_summary && <span className="small">{t.avail_summary.replace(/^.*? — /, "")}</span>}

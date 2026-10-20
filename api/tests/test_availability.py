@@ -24,7 +24,7 @@ def tile(client, jay, monkeypatch):
     db.close()
     job = new_job(jay)
     area = jay.post(f"/api/jobs/{job['id']}/areas", json={"name": "Kitchen"}).json()
-    jay.put(f"/api/areas/{area['id']}/footage", json={"footage": 420, "source": "designer", "by": "Rifky", "confidence": "approximate"})
+    jay.put(f"/api/areas/{area['id']}/footage", json={"footage": 420})
     jay.post(f"/api/jobs/{job['id']}/candidates", json={"source": "stock", "netsuite_item_id": 10846, "area_ids": [area["id"]]})
     tag = jay.get(f"/api/jobs/{job['id']}").json()["candidates"][0]["tags"][0]
     jay.patch(f"/api/tags/{tag['id']}", json={"status": "chosen"})
@@ -64,11 +64,13 @@ def test_not_enough_is_short(jay, tile):
 
 
 def test_needs_a_number_and_square_feet(jay, tile):
-    jay.put(f"/api/areas/{tile['area']['id']}/footage", json={"footage": None})
+    # Chosen in a 420 sf area, the tile started at 420.
+    assert jay.get(f"/api/jobs/{tile['job']['id']}").json()["candidates"][0]["tags"][0]["quantity"] == 420.0
+    jay.patch(f"/api/tags/{tile['tag']['id']}", json={"quantity": None})
     tile["set"](_stock(("A", 1000)))
     r = jay.post(f"/api/tags/{tile['tag']['id']}/availability/check")
     assert r.status_code == 422 and "footage" in r.json()["detail"]
-    # A quantity on the tile itself beats the area's footage.
+    # The number on the tile is the boss.
     jay.patch(f"/api/tags/{tile['tag']['id']}", json={"quantity": 50})
     assert jay.post(f"/api/tags/{tile['tag']['id']}/availability/check").json()["avail_need"] == 50.0
 

@@ -114,10 +114,6 @@ def check(db: Session, est: Estimate) -> dict:
         tag = db.get(CandidateTag, ln.tag_id) if ln.tag_id else None
         if tag and tag.avail_status not in GOOD:
             warnings.append(f"{ln.description}: availability {tag.avail_status or 'not checked'}.")
-    area_ids = {ln.area_id for ln in lines if ln.area_id}
-    approx = [a.name for a in (db.get(Area, i) for i in area_ids) if a and a.footage_confidence == "approximate"]
-    if approx:
-        warnings.append("Approximate footage for " + ", ".join(approx) + ".")
     return {"blockers": blockers, "warnings": warnings}
 
 

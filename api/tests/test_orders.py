@@ -20,7 +20,7 @@ def order(client, jay, office, monkeypatch):
     monkeypatch.setattr(R, "_base_price", lambda item_id: Decimal("7.50"))
     job = new_job(jay)
     kitchen = jay.post(f"/api/jobs/{job['id']}/areas", json={"name": "Kitchen"}).json()
-    jay.put(f"/api/areas/{kitchen['id']}/footage", json={"footage": 100, "source": "takeoff", "confidence": "confirmed"})
+    jay.put(f"/api/areas/{kitchen['id']}/footage", json={"footage": 100})
     jay.post(f"/api/jobs/{job['id']}/candidates", json={"source": "stock", "netsuite_item_id": 10846, "area_ids": [kitchen["id"]]})
     tag = jay.get(f"/api/jobs/{job['id']}").json()["candidates"][0]["tags"][0]
     jay.patch(f"/api/tags/{tag['id']}", json={"status": "chosen"})

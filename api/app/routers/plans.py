@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import admin, member, writer
 from ..db import get_db
-from ..models import AppSetting, Area, JobFile, Task, User
+from ..models import AppSetting, Area, CandidateTag, JobFile, Task, User
 from ..rules.constants import TASK_OPEN
 from ..schemas import FileUpdate, FootageSet, LinkAdd, NextStep, SettingsUpdate, TakeoffRequest
 from ..serialize import row, user_out
@@ -218,7 +218,10 @@ def file_content(file_id: int, t: str, db: Session = Depends(get_db)):
 # ------------------------------------------------------------- footage
 @router.put("/areas/{area_id}/footage")
 def set_footage(area_id: int, body: FootageSet, db: Session = Depends(get_db), user: User = Depends(writer)):
-    """One final number per area, waste included, with who said it and how sure."""
+    """The area's size: only a starting number. It fills in chosen tiles that have no
+    number yet, and new tiles as they're chosen. The number on the tile is the boss."""
+    from ..services.availability import fill_from_area
+
     area = db.get(Area, area_id)
     if area is None:
         raise HTTPException(404, "Area not found.")
@@ -226,15 +229,10 @@ def set_footage(area_id: int, body: FootageSet, db: Session = Depends(get_db), u
         area.footage = area.footage_source = area.footage_by = area.footage_confidence = None
         area.footage_set_at = None
     else:
-        if body.source is None:
-            raise HTTPException(422, "Say where the number came from — customer, designer, installer or our takeoff.")
-        if body.confidence is None:
-            raise HTTPException(422, "Say whether it's approximate or confirmed.")
-        by = body.by or (user.name if body.source == "takeoff" else None)
-        if not by:
-            raise HTTPException(422, "Say who gave the number.")
-        area.footage, area.footage_source, area.footage_by = body.footage, body.source, by
-        area.footage_confidence, area.footage_set_at = body.confidence, now()
+        area.footage, area.footage_source, area.footage_confidence = body.footage, body.source, body.confidence
+        area.footage_by, area.footage_set_at = body.by or user.name, now()
+        for tag in db.scalars(select(CandidateTag).where(CandidateTag.area_id == area.id, CandidateTag.status == "chosen")):
+            fill_from_area(db, tag)
     db.commit()
     return row(area)
 

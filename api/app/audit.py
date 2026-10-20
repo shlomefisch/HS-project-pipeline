@@ -53,13 +53,15 @@ def _row_id(obj: Base) -> str:
 
 
 # ------------------------------------------------------------ story lines
+def _num(v) -> str:
+    value = float(v)
+    return f"{value:,.0f}" if value == int(value) else f"{value:,.2f}"
+
+
 def _footage_line(g) -> str:
     if g("footage") is None:
-        return f"{g('name')}: footage cleared"
-    value = float(g("footage"))
-    num = f"{value:,.0f}" if value == int(value) else f"{value:,.2f}"
-    src = {"takeoff": "our takeoff"}.get(g("footage_source"), g("footage_source"))
-    return f"{g('name')} footage: {num} sf, {g('footage_confidence')} — from {src} ({g('footage_by')})"
+        return f"{g('name')}: size cleared"
+    return f"{g('name')} size: {_num(g('footage'))} sf — starts its tiles"
 
 
 def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
@@ -175,6 +177,8 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
     if table == "candidate_tags":
         if action == "insert":
             return "Tile tagged to an area"
+        if changed("quantity") and not changed("status"):
+            return f"Tile footage: {_num(g('quantity'))}" if g("quantity") is not None else "Tile footage cleared"
         if changed("status"):
             status = g("status")
             if status == "declined":

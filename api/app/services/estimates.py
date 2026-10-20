@@ -1,5 +1,5 @@
 """Assembling an estimate from the job: chosen tiles, per area, priced from
-NetSuite's Base Price. Footage is a hard gate; everything else is a warning
+NetSuite's Base Price. Footage on every chosen tile is a hard gate; everything else is a warning
 the rep sees before anything goes to NetSuite."""
 
 import logging
@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..models import Area, Candidate, CandidateTag, Estimate, EstimateArea, EstimateLine, Item, Job, User
-from .availability import GOOD, need_for
+from .availability import GOOD, need_for, tile_unit
 
 log = logging.getLogger("pipeline.estimates")
 
@@ -40,10 +40,6 @@ def create(db: Session, job: Job, area_ids: list[int], note: str | None, by: Use
     held = [a.name for a in areas if a.status in ("on_hold", "dropped")]
     if held:
         raise HTTPException(422, f"{', '.join(held)} is on hold or dropped — it becomes its own order later.")
-    no_footage = [a.name for a in areas if a.footage is None]
-    if no_footage:
-        raise HTTPException(422, "No footage, no estimate. Still missing: " + ", ".join(no_footage) + ".")
-
     tags = list(db.scalars(
         select(CandidateTag).where(CandidateTag.area_id.in_([a.id for a in areas]), CandidateTag.status == "chosen")
         .order_by(CandidateTag.area_id, CandidateTag.id)
@@ -52,6 +48,9 @@ def create(db: Session, job: Job, area_ids: list[int], note: str | None, by: Use
     empty = [a.name for a in areas if not any(t.area_id == a.id for t in tags)]
     if empty:
         raise HTTPException(422, "Choose a tile first for: " + ", ".join(empty) + ".")
+    no_number = [f"{_tile_name(db, t)} ({by_area[t.area_id].name})" for t in tags if t.quantity is None]
+    if no_number:
+        raise HTTPException(422, "No footage, no estimate. Still missing on: " + ", ".join(no_number) + ".")
 
     est = Estimate(job_id=job.id, status="draft", note=note, created_by=by.id)
     db.add(est)
@@ -69,9 +68,8 @@ def create(db: Session, job: Job, area_ids: list[int], note: str | None, by: Use
         area = by_area[t.area_id]
         item = db.get(Item, cand.netsuite_item_id) if cand.netsuite_item_id else None
         name = cand.name or (item.name if item else f"Item #{cand.netsuite_item_id}")
-        unit = (item.unit if item and item.unit else "SF") if cand.source == "stock" else "SF"
-        is_sf = unit.lower().replace(" ", "").startswith(("sf", "sqft", "sq.ft", "square"))
-        qty = need_for(t, area) if is_sf else t.quantity  # pieces never borrow the area's square feet
+        unit = tile_unit(db, cand)
+        qty = t.quantity  # the number on the tile, square feet or pieces
         base = _price_or_none(price_lookup, cand.netsuite_item_id) if cand.source == "stock" else None
         db.add(EstimateLine(
             estimate_id=est.id, job_id=job.id, tag_id=t.id, area_id=area.id, netsuite_item_id=cand.netsuite_item_id,
@@ -84,22 +82,22 @@ def create(db: Session, job: Job, area_ids: list[int], note: str | None, by: Use
     return est
 
 
+def _tile_name(db: Session, tag: CandidateTag) -> str:
+    cand = db.get(Candidate, tag.candidate_id)
+    item = db.get(Item, cand.netsuite_item_id) if cand.netsuite_item_id else None
+    return cand.name or (item.name if item else f"Item #{cand.netsuite_item_id}")
+
+
 def warnings(db: Session, est: Estimate, lines: list[EstimateLine]) -> list[str]:
     """What the rep should know before this goes to NetSuite."""
     out = []
-    area_ids = list(db.scalars(select(EstimateArea.area_id).where(EstimateArea.estimate_id == est.id)))
-    areas = [db.get(Area, a) for a in area_ids]
-    approx = [a.name for a in areas if a and a.footage_confidence == "approximate"]
-    if approx:
-        out.append("Built on approximate footage for " + ", ".join(approx) + ". When the confirmed number differs, that's a next step.")
     for ln in lines:
         tag = db.get(CandidateTag, ln.tag_id) if ln.tag_id else None
         if tag and tag.avail_status not in GOOD:
             state = {"two_lots": "two lots only", "short": "short", None: "not checked"}.get(tag.avail_status, tag.avail_status)
             out.append(f"{ln.description}: availability {state}.")
         elif tag and tag.avail_status == "available" and tag.avail_need is not None:
-            area = db.get(Area, tag.area_id)
-            need = need_for(tag, area) if area else None
+            need = need_for(tag)
             if need is not None and Decimal(need) != Decimal(tag.avail_need):
                 out.append(f"{ln.description}: availability was checked for {float(tag.avail_need):,.0f}, it now needs {float(need):,.0f} — check again.")
         if ln.quantity is None:

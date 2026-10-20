@@ -1,4 +1,4 @@
-"""Estimates: footage is a hard gate, Base Price by default, the rep can change any price."""
+"""Estimates: footage on every chosen tile is a hard gate, Base Price by default, the rep can change any price."""
 
 from decimal import Decimal
 
@@ -27,12 +27,14 @@ def job(client, jay, monkeypatch):
         jay.post(f"/api/jobs/{j['id']}/candidates", json={"source": "stock", "netsuite_item_id": item_id, "area_ids": [area["id"]]})
     for c in jay.get(f"/api/jobs/{j['id']}").json()["candidates"]:
         for t in c["tags"]:
-            jay.patch(f"/api/tags/{t['id']}", json={"status": "chosen"})
+            # The trim is counted by the piece: its number is typed on the tile.
+            extra = {"quantity": 12} if c["netsuite_item_id"] == 20001 else {}
+            jay.patch(f"/api/tags/{t['id']}", json={"status": "chosen", **extra})
     return {"id": j["id"], "kitchen": kitchen, "mud": mud}
 
 
-def _footage(jay, area, n, confidence="confirmed"):
-    jay.put(f"/api/areas/{area['id']}/footage", json={"footage": n, "source": "takeoff", "confidence": confidence})
+def _footage(jay, area, n):
+    jay.put(f"/api/areas/{area['id']}/footage", json={"footage": n})
 
 
 def test_no_footage_no_estimate(jay, job):
@@ -41,15 +43,14 @@ def test_no_footage_no_estimate(jay, job):
 
 
 def test_lines_priced_from_base_price_and_pieces_dont_borrow_footage(jay, job):
-    _footage(jay, job["kitchen"], 420, "approximate")
+    _footage(jay, job["kitchen"], 420)
     est = jay.post(f"/api/jobs/{job['id']}/estimates", json={"area_ids": [job["kitchen"]["id"]]}).json()
     lines = {ln["description"]: ln for ln in est["lines"]}
     tile = lines["ABK Sensi White 24x48 — Kitchen"]
     assert tile["quantity"] == 420.0 and tile["price"] == 7.5 and tile["base_price"] == 7.5 and tile["amount"] == 3150.0
     trim = lines["Bullnose trim — Kitchen"]
-    assert trim["unit"] == "PC" and trim["quantity"] is None  # pieces, not the kitchen's square feet
-    text = " ".join(est["warnings"])
-    assert "approximate footage" in text and "no quantity" in text and "not checked" in text
+    assert trim["unit"] == "PC" and trim["quantity"] == 12.0  # its own pieces, not the kitchen's square feet
+    assert "not checked" in " ".join(est["warnings"])
     assert jay.post(f"/api/jobs/{job['id']}/estimates", json={"area_ids": [job["kitchen"]["id"]]}).status_code == 409
 
 
@@ -78,6 +79,24 @@ def test_discard_frees_the_job_for_a_new_one(jay, job):
     est = jay.post(f"/api/jobs/{job['id']}/estimates", json={"area_ids": [job["kitchen"]["id"]]}).json()
     assert jay.post(f"/api/estimates/{est['id']}/discard").status_code == 200
     assert jay.post(f"/api/jobs/{job['id']}/estimates", json={"area_ids": [job["kitchen"]["id"]]}).status_code == 201
+
+
+def test_a_tile_without_its_number_stops_the_estimate(jay, job):
+    _footage(jay, job["kitchen"], 420)
+    trim = [c for c in jay.get(f"/api/jobs/{job['id']}").json()["candidates"] if c["netsuite_item_id"] == 20001][0]["tags"][0]
+    jay.patch(f"/api/tags/{trim['id']}", json={"quantity": None})
+    r = jay.post(f"/api/jobs/{job['id']}/estimates", json={"area_ids": [job["kitchen"]["id"]]})
+    assert r.status_code == 422 and "Bullnose trim" in r.json()["detail"]
+
+
+def test_the_area_number_never_overwrites_a_tile(jay, job):
+    _footage(jay, job["kitchen"], 420)
+    tile = [c for c in jay.get(f"/api/jobs/{job['id']}").json()["candidates"] if c["netsuite_item_id"] == 10846][0]
+    tag = [t for t in tile["tags"] if t["area_id"] == job["kitchen"]["id"]][0]
+    jay.patch(f"/api/tags/{tag['id']}", json={"quantity": 380})
+    _footage(jay, job["kitchen"], 500)
+    tags = {t["id"]: t for c in jay.get(f"/api/jobs/{job['id']}").json()["candidates"] for t in c["tags"]}
+    assert tags[tag["id"]]["quantity"] == 380.0
 
 
 def test_a_zero_quantity_is_refused_not_a_crash(jay, job):

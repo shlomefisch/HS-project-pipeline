@@ -688,3 +688,15 @@ body:has(.login) { background: radial-gradient(120% 90% at 20% 0%, #24486a 0%, v
 .camera-tools { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
 .camera-tip { text-align: center; margin: 8px 0 0; }
 .camera-frame { inset: 20%; }
+
+/* ---- footage typed on the tile */
+.footage-areas { display: flex; flex-direction: column; gap: 12px; }
+.footage-area { border: 1px solid var(--grout); border-radius: 12px; background: var(--surface); padding: 10px 14px 4px; }
+.footage-area-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--grout); }
+.footage-none { margin: 8px 0 10px; }
+.tile-number { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; flex-wrap: wrap; }
+.tile-number + .tile-number { border-top: 1px dashed var(--grout); }
+.tile-number-name { min-width: 0; flex: 1 1 12em; }
+.tile-number-box { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--stone); }
+.tile-number-box input { width: 7.5em; text-align: right; font-weight: 600; font-size: 1rem; padding: 8px 10px; }
+.tile-number-empty input { border-color: var(--oxide); background: var(--oxide-soft); }

@@ -6,6 +6,7 @@ import type { Area, AuditEntry, Job, Task } from "../types";
 import { Photo } from "../photo";
 import { Icon } from "../icons";
 import { CompleteTask } from "./TaskActions";
+import { chosenTiles, inSqft, num, unitOf } from "../footage";
 
 export type JobTab = "overview" | "selection" | "plans" | "estimate" | "orders" | "steps" | "people" | "story";
 
@@ -28,11 +29,11 @@ function whatNow(job: Job, userName: (id: number | null | undefined) => string):
       return { stage: "Selection", text: `${names(missing)} ${missing.length === 1 ? "has" : "have"} no tile chosen yet.`, go: "selection", button: "Choose tiles" };
     }
     case "footage": {
-      const missing = live.filter((a) => a.footage == null);
+      const missing = live.filter((a) => chosenTiles(job, a.id).some(({ t }) => t.quantity == null));
       const takeoff = job.tasks.find((t) => t.id === job.open_takeoff_id);
       return {
         stage: "Footage",
-        text: `${names(missing)} still ${missing.length === 1 ? "needs" : "need"} a number.` + (takeoff ? ` The takeoff is with ${userName(takeoff.assignee_id)}, due ${niceDate(takeoff.due_date).toLowerCase()}.` : ""),
+        text: `Tiles in ${names(missing)} still need their footage.` + (takeoff ? ` The takeoff is with ${userName(takeoff.assignee_id)}, due ${niceDate(takeoff.due_date).toLowerCase()}.` : ""),
         go: "plans",
         button: "Enter footage",
       };
@@ -124,10 +125,13 @@ export function Overview({ job, onGo }: { job: Job; onGo: (t: JobTab) => void })
               const chosen = chosenIn(job, a.id);
               const first = chosen[0];
               const tags = chosen.flatMap((c) => c.tags.filter((t) => t.area_id === a.id && t.status === "chosen"));
+              const tiles = chosenTiles(job, a.id);
+              const sqft = tiles.reduce((n, { c, t }) => n + (inSqft(unitOf(c)) ? t.quantity ?? 0 : 0), 0);
+              const pieces = tiles.reduce((n, { c, t }) => n + (inSqft(unitOf(c)) ? 0 : t.quantity ?? 0), 0);
               const considering = job.candidates.filter((c) => c.tags.some((t) => t.area_id === a.id && t.status === "considering")).length;
               const avail = tags.length === 0 ? null : tags.every((t) => GOOD.includes(t.avail_status ?? "")) ? "ok" : tags.some((t) => ["short", "two_lots"].includes(t.avail_status ?? "")) ? "short" : "check";
               return (
-                <button key={a.id} className="area-tr" role="row" onClick={() => onGo(a.footage == null && first ? "plans" : "selection")}>
+                <button key={a.id} className="area-tr" role="row" onClick={() => onGo(first && tags.some((t) => t.quantity == null) ? "plans" : "selection")}>
                   <span role="cell" className="area-td-name"><strong>{a.name}</strong></span>
                   <span role="cell" className="area-td-tile">
                     {first ? (
@@ -139,7 +143,7 @@ export function Overview({ job, onGo }: { job: Job; onGo: (t: JobTab) => void })
                       <span className="muted">{considering ? `${considering} being considered` : "Nothing yet"}</span>
                     )}
                   </span>
-                  <span role="cell">{a.footage != null ? <>{a.footage.toLocaleString()} sf <span className={`pill ${a.footage_confidence === "confirmed" ? "pill-ok" : "pill-warn"}`}>{a.footage_confidence === "confirmed" ? "confirmed" : "approx."}</span></> : a.status === "on_hold" ? <span className="muted">—</span> : <span className="footage-missing">needed</span>}</span>
+                  <span role="cell">{!first || a.status === "on_hold" ? <span className="muted">{a.footage != null ? `${num(a.footage)} sf area` : "—"}</span> : tags.some((t) => t.quantity == null) ? <span className="footage-missing">needed</span> : <>{num(sqft)} sf{pieces ? <span className="muted"> + {num(pieces)} pc</span> : null}</>}</span>
                   <span role="cell">{avail === "ok" ? <span className="pill pill-ok">available</span> : avail === "short" ? <span className="pill pill-bad">short</span> : avail === "check" ? <span className="pill pill-warn">to check</span> : <span className="muted">—</span>}</span>
                   <span role="cell" className="muted">{AREA_STATE[a.status] ?? a.status}{a.status === "on_hold" && a.hold_until ? ` till ${niceDate(a.hold_until)}` : ""}</span>
                 </button>

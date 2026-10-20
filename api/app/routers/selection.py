@@ -194,6 +194,10 @@ def update_tag(tag_id: int, body: TagUpdate, db: Session = Depends(get_db), user
     elif status == "considering":
         # Un-crossing: the decision is undone; the old one stays in the history.
         tag.status, tag.reason, tag.decided_at, tag.decided_by = "considering", None, None, None
+    if status == "chosen" and "quantity" not in data:
+        from ..services.availability import fill_from_area
+
+        fill_from_area(db, tag)
     db.commit()
     return row(tag)
 

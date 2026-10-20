@@ -53,7 +53,8 @@ def for_jobs(db: Session, job_ids: list[int]) -> dict[int, dict]:
         done = {
             "lead": True,
             "selection": bool(every) and all(chosen.get(a.id) for a in working),
-            "footage": bool(every) and all(a.footage is not None for a in working),
+            # The number on each chosen tile is the footage; the area's number only starts new tiles.
+            "footage": (bool(tags) or bool(past)) and all(t.quantity is not None for t in tags),
             "availability": (bool(tags) or bool(past)) and all(t.avail_status in GOOD for t in tags),
             "estimate": bool(est.get(jid)),
             "ordered": bool(stages.get(jid)),

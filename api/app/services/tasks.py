@@ -93,9 +93,18 @@ def complete(db: Session, task: Task, outcome: str, note: str | None, step: Next
         areas = list(db.scalars(select(Area).where(Area.job_id == job.id, Area.status.in_(("open", "decided")))))
         if not areas:
             raise HTTPException(422, "Add the job's areas first — the takeoff gives each one its footage.")
-        missing = [a.name for a in areas if a.footage is None]
+        from ..models import CandidateTag
+
+        chosen: dict[int, list] = {}
+        for t in db.scalars(select(CandidateTag).where(CandidateTag.job_id == job.id, CandidateTag.status == "chosen")):
+            chosen.setdefault(t.area_id, []).append(t)
+        # Measured: every chosen tile has its number, or, before tiles are chosen, the area has its size.
+        missing = [
+            a.name for a in areas
+            if any(t.quantity is None for t in chosen.get(a.id, [])) or (not chosen.get(a.id) and a.footage is None)
+        ]
         if missing:
-            raise HTTPException(422, "The takeoff isn't done until every area has footage. Still missing: " + ", ".join(missing) + ".")
+            raise HTTPException(422, "The takeoff isn't done until every area is measured. Still missing: " + ", ".join(missing) + ".")
 
     if outcome == "bad_answer" and step is None:
         raise HTTPException(422, "A bad answer needs a next step — usually the rep calling the customer.")

@@ -3,6 +3,7 @@ import { api } from "../api";
 import { niceDate, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Loading, Sheet, useAction } from "../ui";
 import type { Estimate, EstimateLine, Job } from "../types";
+import { chosenTiles, inSqft, unitOf } from "../footage";
 import { SendEstimate } from "./SendEstimate";
 import { celebrateHere } from "../celebrate";
 
@@ -43,25 +44,31 @@ export function EstimateTab({ job, reload }: { job: Job; reload: () => void }) {
 
 function Start({ job, onDone }: { job: Job; onDone: () => void }) {
   const ready = job.areas.filter((a) => a.status === "open" || a.status === "decided");
-  const [picked, setPicked] = useState<number[]>(ready.filter((a) => a.footage != null).map((a) => a.id));
+  const problemOf = (areaId: number) => {
+    const here = chosenTiles(job, areaId);
+    if (!here.length) return "no tile chosen";
+    const open = here.filter(({ t }) => t.quantity == null).length;
+    return open ? `${open} tile${open === 1 ? "" : "s"} without footage` : null;
+  };
+  const [picked, setPicked] = useState<number[]>(ready.filter((a) => !problemOf(a.id)).map((a) => a.id));
   const { busy, error, run } = useAction();
-  const chosenIn = (areaId: number) => job.candidates.some((c) => c.tags.some((t) => t.area_id === areaId && t.status === "chosen"));
   return (
     <section className="section">
       <h2>Put together an estimate</h2>
-      <p className="muted small">Pick the areas that go on this order. Each needs its footage and a chosen tile. Areas on hold become their own order later.</p>
+      <p className="muted small">Pick the areas that go on this order. Each needs a chosen tile with its footage. Areas on hold become their own order later.</p>
       {ready.length === 0 ? (
         <Empty>No open areas on this job.</Empty>
       ) : (
         <ul className="list">
           {ready.map((a) => {
-            const problem = a.footage == null ? "no footage yet" : !chosenIn(a.id) ? "no tile chosen" : null;
+            const problem = problemOf(a.id);
+            const sq = chosenTiles(job, a.id).reduce((n, { c, t }) => n + (inSqft(unitOf(c)) ? t.quantity ?? 0 : 0), 0);
             return (
               <li key={a.id}>
                 <label className="check">
                   <input type="checkbox" checked={picked.includes(a.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, a.id] : picked.filter((x) => x !== a.id))} />
                   <span><strong>{a.name}</strong>{" "}
-                    <span className={problem ? "footage-missing small" : "muted small"}>{problem ?? `${qtyFmt(a.footage)} sf, ${a.footage_confidence}`}</span>
+                    <span className={problem ? "footage-missing small" : "muted small"}>{problem ?? `${qtyFmt(sq)} sf`}</span>
                   </span>
                 </label>
               </li>
