@@ -10,14 +10,15 @@ import { Selection } from "./JobSelection";
 import { Plans } from "./JobPlans";
 import { EstimateTab } from "./JobEstimate";
 import { Orders } from "./JobOrders";
+import { NowPanel, Overview, type JobTab } from "./JobOverview";
 import { AddTask, EditJob, HoldJob, LogEvent, LoseJob, ResolveVisit, ReviveJob, ScheduleVisit } from "./JobSheets";
 
-type Tab = "selection" | "plans" | "estimate" | "orders" | "steps" | "people" | "story";
+type Tab = JobTab;
 type SheetKind = null | "log" | "schedule" | "task" | "edit" | "hold" | "lose" | "revive" | "more";
 
 export function JobPage({ id }: { id: number }) {
   const { data: job, error, reload } = useLoad(() => api.get<Job>(`/jobs/${id}`), [id]);
-  const [tab, setTab] = useState<Tab>("selection");
+  const [tab, setTab] = useState<Tab>("overview");
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [logVisit, setLogVisit] = useState<Visit | null>(null);
   const { userName } = useApp();
@@ -40,7 +41,7 @@ export function JobPage({ id }: { id: number }) {
           Jobs
         </a>
         <h1>{job.name}</h1>
-        <ProgressTiles progress={job.progress} size="large" />
+        <ProgressTiles progress={job.progress} size="large" onPick={(key) => setTab(STAGE_TAB[key] ?? "overview")} />
         <p className="muted">
           {[job.address && job.address !== job.name ? job.address : null, job.class_code, `Rep: ${userName(job.rep_id)}`, contact ? `Contact: ${contact.name}` : null]
             .filter(Boolean)
@@ -80,15 +81,18 @@ export function JobPage({ id }: { id: number }) {
         </div>
       )}
 
+      {job.status !== "closed" && job.status !== "lost" && <NowPanel job={job} onGo={setTab} reload={reload} />}
+
       <div className="job-body">
       <div className="job-main">
       <nav className="tabs" role="tablist">
         {(
           [
+            ["overview", "Overview"],
             ["selection", "Selection"],
             ["plans", "Plans"],
             ["estimate", "Estimate"],
-            ["orders", "Orders"],
+            ...((job.orders ?? []).length ? ([["orders", "Orders"]] as [Tab, string][]) : []),
             ["steps", `Steps ${job.open_tasks ? `(${job.open_tasks})` : ""}`],
             ["people", "People"],
             ["story", "Story"],
@@ -100,6 +104,7 @@ export function JobPage({ id }: { id: number }) {
         ))}
       </nav>
 
+      {tab === "overview" && <Overview job={job} onGo={setTab} />}
       {tab === "selection" && <Selection job={job} reload={reload} />}
       {tab === "plans" && <Plans job={job} reload={reload} />}
       {tab === "estimate" && <EstimateTab job={job} reload={reload} />}
@@ -327,6 +332,12 @@ function describe(e: AuditEntry): string {
     .join("; ");
   return `${table}: ${fields}`;
 }
+
+// Tapping a progress tile goes where that stage is worked.
+const STAGE_TAB: Record<string, Tab> = {
+  lead: "overview", selection: "selection", footage: "plans", availability: "plans",
+  estimate: "estimate", ordered: "estimate", delivery: "orders", closed: "orders",
+};
 
 // ------------------------------------------- the side panel, on wide screens
 function JobRail({ job, onSteps }: { job: Job; onSteps: () => void }) {

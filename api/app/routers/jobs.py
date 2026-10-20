@@ -10,11 +10,13 @@ from ..models import (
     Candidate,
     CandidateTag,
     Entity,
+    Estimate,
     Event,
     EventPerson,
     Item,
     Job,
     JobRole,
+    Order,
     Sample,
     ScheduledVisit,
     Task,
@@ -217,6 +219,11 @@ def job_detail(db: Session, job: Job) -> dict:
             "open_tasks": len(open_tasks),
             "open_takeoff_id": next((t.id for t in open_tasks if t.kind == "takeoff"), None),
             "progress": job_progress(db, [job.id])[job.id],
+            "orders": [
+                {"id": o.id, "stage": o.stage, "handler_id": o.handler_id, "estimate_id": o.estimate_id}
+                for o in db.scalars(select(Order).where(Order.job_id == job.id).order_by(Order.id))
+            ],
+            "draft_estimate_id": db.scalar(select(Estimate.id).where(Estimate.job_id == job.id, Estimate.status == "draft")),
             "stuck": job.status == "active" and not open_tasks,
         }
     )

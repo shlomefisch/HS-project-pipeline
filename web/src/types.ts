@@ -178,6 +178,8 @@ export interface JobSummary {
   open_tasks: number;
   open_takeoff_id?: number | null;
   progress?: Progress | null;
+  orders?: { id: number; stage: string; handler_id: number | null; estimate_id: number }[];
+  draft_estimate_id?: number | null;
   next_due: string | null;
   stuck: boolean;
 }
