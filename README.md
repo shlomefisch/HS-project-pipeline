@@ -14,9 +14,9 @@ stalls because nobody knew it was their turn.
 - The rep's morning view: went wrong, today's visits, due now, stuck.
 - Every change to every table logged field by field. "The story" and "Everything" on each job.
 
-**NetSuite:** read-only item sync (inventory items, hourly, plus Sync now on the Team screen).
+**NetSuite:** read-only item sync (inventory items, hourly, plus Sync now on the Team screen), and live stock on a stock tile — free and on hand by location and lot (cached 5 minutes).
 
-**Not yet:** the NetSuite push and read-back, lot availability, push notifications, templates, footage and availability, away/gone, offline queue.
+**Not yet:** the NetSuite push and read-back,  push notifications, templates, footage and availability, away/gone, offline queue.
 The item list is a stand-in table until the sync exists.
 
 ## Layout

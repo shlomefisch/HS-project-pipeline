@@ -227,6 +227,22 @@ def resolve_item(code: str, db: Session = Depends(get_db), _: User = Depends(mem
     return {"netsuite_id": item_id, "found": item is not None, "item": row(item)}
 
 
+@router.get("/items/{item_id}/stock")
+def item_stock(item_id: int, fresh: bool = False, _: User = Depends(member)):
+    """Live from NetSuite: on hand and still free, by location and lot."""
+    from ..config import settings
+    from ..netsuite import NetSuiteError
+    from ..services import stock
+    from ..services.item_sync import client_from_settings
+
+    if not settings.netsuite_configured:
+        raise HTTPException(409, "NetSuite isn't connected, so stock can't be checked.")
+    try:
+        return stock.get(client_from_settings, item_id, fresh=fresh)
+    except NetSuiteError as exc:
+        raise HTTPException(502, f"Couldn't get stock from NetSuite. {exc}") from exc
+
+
 @router.get("/items")
 def search_items(q: str = "", limit: int = 25, db: Session = Depends(get_db), _: User = Depends(member)):
     stmt = select(Item).where(Item.active.is_(True))

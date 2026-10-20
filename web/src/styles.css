@@ -286,3 +286,15 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .handoff dt { color: var(--stone); }
 .handoff dd { margin: 0; font-weight: 600; word-break: break-all; }
 .handoff .mono { font-family: ui-monospace, monospace; font-size: 1.15rem; letter-spacing: 0.06em; }
+
+/* Live stock on a tile */
+.stock { margin: 8px 0 16px; padding: 12px; border: 1px solid var(--grout); border-radius: var(--radius); background: var(--surface); }
+.stock-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.stock-total { margin: 4px 0 8px; }
+.stock-free { font-size: 1.25rem; font-weight: 700; color: var(--glaze); }
+.stock-none { margin: 4px 0; color: var(--oxide); font-weight: 600; }
+.stock-warn { margin: 4px 0 8px; padding: 6px 8px; border-radius: 6px; background: var(--ochre-soft); color: var(--ochre); font-size: 0.92rem; }
+.stock-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.stock-table th { text-align: left; font-weight: 600; color: var(--stone); border-bottom: 1px solid var(--grout); padding: 4px 4px; }
+.stock-table td { padding: 6px 4px; border-bottom: 1px solid var(--grout); }
+.stock-table .num { text-align: right; font-variant-numeric: tabular-nums; }

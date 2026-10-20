@@ -209,3 +209,19 @@ export interface NextStep {
   notes?: string | null;
   area_id?: number | null;
 }
+
+export interface StockRow {
+  location: string;
+  lot: string | null;
+  on_hand: number;
+  available: number;
+}
+
+export interface Stock {
+  item_id: number;
+  as_of: string;
+  unit: string | null;
+  by_lot: boolean;
+  rows: StockRow[];
+  totals: { on_hand: number; available: number };
+}
