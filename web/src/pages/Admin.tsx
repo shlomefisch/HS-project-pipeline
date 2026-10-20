@@ -57,7 +57,7 @@ function EditUser({ user, onClose, onDone }: { user: User; onClose: () => void; 
   const { meta, me } = useApp();
   const [form, setForm] = useState({
     name: user.name,
-    role: user.role === "pending" ? "rep" : user.role,
+    role: (user.role === "pending" ? "rep" : user.role) as User["role"],
     home_showroom: user.home_showroom ?? meta.showrooms[0],
     default_class: user.default_class ?? meta.classes[0],
     is_admin: user.is_admin,

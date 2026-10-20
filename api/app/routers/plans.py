@@ -110,7 +110,12 @@ def upload_files(
         if not data:
             raise HTTPException(422, f"{up.filename or 'A file'} is empty.")
         name = F.clean_name(up.filename, "photo.jpg")
-        f = JobFile(job_id=job.id, area_id=area_id, kind=kind, name=name, content_type=F.guess_type(name, up.content_type),
+        # The file's own name decides its type; what the browser claims only fills a gap,
+        # and only for types that are safe to open here.
+        ctype = F.guess_type(name)
+        if ctype == "application/octet-stream" and (up.content_type or "").split(";")[0] in INLINE_TYPES:
+            ctype = up.content_type.split(";")[0]
+        f = JobFile(job_id=job.id, area_id=area_id, kind=kind, name=name, content_type=ctype,
                     size_bytes=len(data), source="upload", status="ready", created_by=user.id)
         db.add(f)
         db.flush()
