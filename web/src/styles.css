@@ -687,7 +687,7 @@ body:has(.login) { background: radial-gradient(120% 90% at 20% 0%, #24486a 0%, v
 
 .camera-tools { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
 .camera-tip { text-align: center; margin: 8px 0 0; }
-.camera-frame { inset: 20%; }
+.camera-frame { inset: 30% 25%; }
 
 /* ---- footage typed on the tile */
 .footage-areas { display: flex; flex-direction: column; gap: 12px; }
@@ -707,5 +707,5 @@ body:has(.login) { background: radial-gradient(120% 90% at 20% 0%, #24486a 0%, v
 .sample-replied { background: var(--green-soft, #e6f2ea); color: var(--green); }
 .tile-samples { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--grout); }
 .tile-samples h3 { margin: 0; font-size: 1rem; }
-.snap { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 8px 0 4px; }
-.snap .btn { width: 100%; max-width: 360px; }
+.camera-light { position: absolute; right: 12px; bottom: 12px; border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 600; background: rgba(0, 0, 0, 0.55); color: #fff; }
+.camera-light-on { background: var(--sand); color: var(--slate); }
