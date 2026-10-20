@@ -111,17 +111,39 @@ function OrderCard({ job, order: o, onChanged }: { job: Job; order: Order; onCha
       </details>
       <ErrorLine error={error} />
 
-      {sheet === "approve" && <ApproveSheet order={o} onClose={() => setSheet(null)} onDone={() => { setSheet(null); celebrateHere(); onChanged(); }} />}
+      {sheet === "approve" && <ApproveSheet job={job} order={o} onClose={() => setSheet(null)} onDone={() => { setSheet(null); celebrateHere(); onChanged(); }} />}
       {sheet === "lose" && <LoseSheet order={o} onClose={() => setSheet(null)} onDone={() => { setSheet(null); onChanged(); }} />}
       {sheet && typeof sheet === "object" && <QtySheet order={o} lineId={sheet.lineId} onClose={() => setSheet(null)} onDone={() => { setSheet(null); onChanged(); }} />}
     </section>
   );
 }
 
-function ApproveSheet({ order, onClose, onDone }: { order: Order; onClose: () => void; onDone: () => void }) {
+function ApproveSheet({ job, order, onClose, onDone }: { job: Job; order: Order; onClose: () => void; onDone: () => void }) {
   const [handler, setHandler] = useState<number | null>(null);
   const [ref, setRef] = useState("");
+  const [askPm, setAskPm] = useState(false);
   const { busy, error, run } = useAction();
+  // Once it's approved, the customer's PM usually becomes the one to call.
+  const pm = job.roles.find((r) => r.active && r.role === "pm" && r.entity.id !== job.default_contact_id);
+  const current = job.roles.find((r) => r.active && r.entity.id === job.default_contact_id)?.entity.name;
+
+  if (askPm && pm)
+    return (
+      <Sheet title="Approved — switch the main contact?" onClose={onDone}>
+        <p>
+          <strong>{pm.entity.name}</strong> is the customer's PM on this job. Make them the main contact from here on
+          {current ? <>, instead of {current}</> : null}?
+        </p>
+        <ErrorLine error={error} />
+        <div className="actions">
+          <button className="btn btn-quiet" disabled={busy} onClick={onDone}>Keep {current ?? "it as is"}</button>
+          <button className="btn btn-primary" disabled={busy} onClick={() => run(async () => { await api.patch(`/jobs/${job.id}`, { default_contact_id: pm.entity.id }); onDone(); })}>
+            Make {pm.entity.name} the main contact
+          </button>
+        </div>
+      </Sheet>
+    );
+
   return (
     <Sheet title="Approved — sales order made" onClose={onClose}>
       <p className="muted small">Pick who handles it from here. From now on the order's work and problems go to them, not the rep.</p>
@@ -130,7 +152,13 @@ function ApproveSheet({ order, onClose, onDone }: { order: Order; onClose: () =>
       <ErrorLine error={error} />
       <div className="actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" disabled={busy || !handler} onClick={() => run(async () => { await api.post(`/orders/${order.id}/approve`, { handler_id: handler, netsuite_order_ref: ref || null }); onDone(); })}>Approve</button>
+        <button
+          className="btn btn-primary"
+          disabled={busy || !handler}
+          onClick={() => run(async () => { await api.post(`/orders/${order.id}/approve`, { handler_id: handler, netsuite_order_ref: ref || null }); if (pm) setAskPm(true); else onDone(); })}
+        >
+          Approve
+        </button>
       </div>
     </Sheet>
   );
