@@ -140,6 +140,26 @@ def update_candidate(candidate_id: int, body: CandidateUpdate, db: Session = Dep
     return row(cand)
 
 
+@router.delete("/candidates/{candidate_id}")
+def remove_candidate(candidate_id: int, db: Session = Depends(get_db), _: User = Depends(writer)):
+    """For tiles added by mistake: only while nothing has been decided on them.
+    A tile that was chosen or declined anywhere stays, crossed out, for the history."""
+    cand = db.get(Candidate, candidate_id)
+    if cand is None:
+        raise HTTPException(404, "Tile not found.")
+    tags = list(db.scalars(select(CandidateTag).where(CandidateTag.candidate_id == cand.id)))
+    if any(t.status != "considering" for t in tags):
+        raise HTTPException(409, "This tile was chosen or declined for an area, so it stays on the job. Decline it instead.")
+    for smp in db.scalars(select(Sample).where(Sample.candidate_id == cand.id)):
+        smp.candidate_id = None  # the sample stays on the job, just not tied to this tile
+    for t in tags:
+        db.delete(t)
+    db.flush()
+    db.delete(cand)
+    db.commit()
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------- tags
 @router.post("/candidates/{candidate_id}/tags", status_code=201)
 def add_tag(candidate_id: int, body: TagCreate, db: Session = Depends(get_db), _: User = Depends(writer)):

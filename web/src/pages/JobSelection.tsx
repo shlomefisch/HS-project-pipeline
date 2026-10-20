@@ -368,6 +368,17 @@ function TagSheet({ job, tag, cand, onClose, onDone }: { job: Job; tag: Tag; can
         </Field>
       )}
       <ErrorLine error={error} />
+      {cand.tags.every((t) => t.status === "considering") && !declining && (
+        <div className="sheet-foot">
+          <button
+            className="btn btn-quiet btn-danger-text"
+            disabled={busy}
+            onClick={() => run(async () => { await api.del(`/candidates/${cand.id}`); onDone(); })}
+          >
+            Remove this tile from the job (added by mistake)
+          </button>
+        </div>
+      )}
     </Sheet>
   );
 }

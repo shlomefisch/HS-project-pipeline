@@ -193,7 +193,11 @@ def job_detail(db: Session, job: Job) -> dict:
         d = row(c)
         item = items.get(c.netsuite_item_id) if c.netsuite_item_id else None
         d["item"] = row(item)
-        d["display_name"] = c.name or (item.name if item else f"Item #{c.netsuite_item_id} (details pending)")
+        # Our stock: NetSuite's name is the truth. Typed names only stand in until the item is known.
+        if c.source == "stock" and item is not None:
+            d["display_name"] = item.name
+        else:
+            d["display_name"] = c.name or f"Item #{c.netsuite_item_id} (details pending)"
         d["tags"] = tags_by_cand.get(c.id, [])
         d["needs_lead_time"] = c.source == "overseas" and c.lead_time_weeks is None
         cand_out.append(d)

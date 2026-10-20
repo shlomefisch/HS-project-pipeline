@@ -144,6 +144,8 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
 
     if table == "candidates" and action == "insert":
         return f"Tile added: {g('name') or ('item #' + str(g('netsuite_item_id')))}"
+    if table == "candidates" and action == "delete":
+        return f"Tile removed (added by mistake): {g('name') or ('item #' + str(g('netsuite_item_id')))}"
 
     if table == "candidate_tags" and action == "update" and changed("avail_checked_at") and g("avail_summary"):
         return g("avail_summary")

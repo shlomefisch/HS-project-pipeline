@@ -103,3 +103,18 @@ def test_sample_marked_sent_gets_todays_date(jay):
     s = jay.post(f"/api/jobs/{job['id']}/samples", json={"description": "Calacatta + Carrara"}).json()
     r = jay.patch(f"/api/samples/{s['id']}", json={"status": "sent"})
     assert r.json()["sent_on"] is not None
+
+
+def test_a_tile_added_by_mistake_can_be_removed_until_decided(jay):
+    job = new_job(jay)
+    (kitchen,) = _areas(jay, job["id"], "Kitchen")
+    jay.post(f"/api/jobs/{job['id']}/candidates", json={"source": "local", "name": "Oops tile"})
+    jay.post(f"/api/jobs/{job['id']}/candidates", json={"source": "local", "name": "Kept tile", "area_ids": [kitchen["id"]]})
+    cands = {c["name"]: c for c in jay.get(f"/api/jobs/{job['id']}").json()["candidates"]}
+    assert jay.delete(f"/api/candidates/{cands['Oops tile']['id']}").status_code == 200
+    jay.patch(f"/api/tags/{cands['Kept tile']['tags'][0]['id']}", json={"status": "chosen"})
+    assert jay.delete(f"/api/candidates/{cands['Kept tile']['id']}").status_code == 409
+    names = [c["name"] for c in jay.get(f"/api/jobs/{job['id']}").json()["candidates"]]
+    assert names == ["Kept tile"]
+    story = [e["summary"] for e in jay.get(f"/api/jobs/{job['id']}/timeline").json()]
+    assert "Tile removed (added by mistake): Oops tile" in story
