@@ -267,7 +267,7 @@ function LinkSheet({ job, onClose, onDone }: { job: Job; onClose: () => void; on
   return (
     <Sheet title="Paste a link" onClose={onClose}>
       <Field label="Link" hint="Dropbox files and folders, and Google Drive files, are pulled in and kept here. A private link or a Drive folder will say it needs a download.">
-        <input type="url" inputMode="url" autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.dropbox.com/…" />
+        <input type="url" inputMode="url" autoFocus value={url} onChange={(e) => setUrl(e.target.value)} />
       </Field>
       <KindAndArea job={job} kind={kind} setKind={setKind} areaId={areaId} setAreaId={setAreaId} />
       <ErrorLine error={error} />
@@ -310,7 +310,7 @@ function FootageSheet({ job, area, onClose, onDone }: { job: Job; area: Area; on
         </div>
       </Field>
       <Field label="Who said it">
-        <input value={by} onChange={(e) => setBy(e.target.value)} placeholder={source === "takeoff" ? me.name : "Name"} />
+        <input value={by} onChange={(e) => setBy(e.target.value)} />
       </Field>
       <Field label="How sure">
         <div className="chips">
@@ -444,7 +444,7 @@ function TwoLotsSheet({ tag, cand, onClose, onDone }: { tag: Tag; cand: Candidat
     <Sheet title="Go ahead on two lots" onClose={onClose}>
       <p>{cand.display_name}: no single lot covers it. Two lots can differ in shade — it's your call.</p>
       <Field label="Why it's fine" hint="Logged on the job. No customer sign-off needed.">
-        <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Two separate rooms — the lots won't meet" />
+        <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} />
       </Field>
       <ErrorLine error={error} />
       <div className="actions">
@@ -474,7 +474,7 @@ function ConfirmSheet({ tag, cand, onClose, onDone }: { tag: Tag; cand: Candidat
         </Field>
       )}
       <Field label="Note" hint={overseas ? "Optional — e.g. ships from Italy on the 3rd." : "Required if they're short."}>
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={overseas ? "" : "Out until December"} />
+        <input value={note} onChange={(e) => setNote(e.target.value)} />
       </Field>
       <ErrorLine error={error} />
       <div className="actions actions-wrap">

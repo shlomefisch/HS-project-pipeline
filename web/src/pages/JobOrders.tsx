@@ -126,7 +126,7 @@ function ApproveSheet({ order, onClose, onDone }: { order: Order; onClose: () =>
     <Sheet title="Approved — sales order made" onClose={onClose}>
       <p className="muted small">Pick who handles it from here. From now on the order's work and problems go to them, not the rep.</p>
       <UserSelect label="Handler" value={handler} onChange={setHandler} />
-      <Field label="NetSuite sales order number" hint="Optional."><input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="SO-1234" /></Field>
+      <Field label="NetSuite sales order number" hint="Optional."><input value={ref} onChange={(e) => setRef(e.target.value)} /></Field>
       <ErrorLine error={error} />
       <div className="actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
@@ -141,7 +141,7 @@ function LoseSheet({ order, onClose, onDone }: { order: Order; onClose: () => vo
   const { busy, error, run } = useAction();
   return (
     <Sheet title="Order lost" onClose={onClose}>
-      <Field label="Why"><input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Went with a cheaper quote" /></Field>
+      <Field label="Why"><input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
       <ErrorLine error={error} />
       <div className="actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
@@ -160,7 +160,7 @@ function QtySheet({ order, lineId, onClose, onDone }: { order: Order; lineId: nu
     <Sheet title="Change after the order" onClose={onClose}>
       <p><strong>{ln.description}</strong><br /><span className="muted small">Ordered: {qty(ln.quantity)} {ln.unit}. A whole new area is a new order instead.</span></p>
       <Field label={`New quantity (${ln.unit ?? "SF"})`}><input inputMode="decimal" value={q} onChange={(e) => setQ(e.target.value.replace(/[^\d.]/g, ""))} /></Field>
-      <Field label="Why"><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Customer added the pantry floor" /></Field>
+      <Field label="Why"><input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
       <ErrorLine error={error} />
       <div className="actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>

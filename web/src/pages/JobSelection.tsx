@@ -245,7 +245,7 @@ export function AddTile({ job, onClose, onDone, scanned }: { job: Job; onClose: 
       ) : (
         <>
           <Field label="What is it">
-            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Italian terrazzo 24x24, verde" />
+            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Supplier">
             <input value={supplier} onChange={(e) => setSupplier(e.target.value)} />
@@ -346,7 +346,7 @@ function TagSheet({ job, tag, cand, onClose, onDone }: { job: Job; tag: Tag; can
       {declining && (
         <>
           <Field label="Why not?" hint="Stays on the list, crossed out, with this reason.">
-            <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Too cold next to the floor" />
+            <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} />
           </Field>
           <div className="actions">
             <button className="btn btn-quiet" onClick={() => setDeclining(false)}>Back</button>
@@ -409,7 +409,7 @@ function NewArea({ job, onClose, onDone }: { job: Job; onClose: () => void; onDo
       </div>
       <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) save(name); }}>
         <Field label="Or type it">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guest bath, 2nd floor" />
+          <input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <ErrorLine error={error} />
         <div className="actions">
@@ -442,7 +442,7 @@ function AreaSheet({ area, onClose, onDone }: { area: Area; onClose: () => void;
             <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
           </Field>
           <Field label="Why">
-            <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Basement waits till next year" />
+            <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} />
           </Field>
           <div className="actions">
             <button className="btn btn-quiet" onClick={() => setHolding(false)}>Back</button>
@@ -463,7 +463,7 @@ function NewSample({ job, onClose, onDone }: { job: Job; onClose: () => void; on
   return (
     <Sheet title="Request a sample" onClose={onClose}>
       <Field label="Which samples">
-        <input autoFocus value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Calacatta + Carrara, 2 pieces each" />
+        <input autoFocus value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
       <Field label="For">
         <select value={areaId ?? ""} onChange={(e) => setAreaId(e.target.value ? Number(e.target.value) : null)}>

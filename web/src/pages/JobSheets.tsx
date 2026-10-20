@@ -63,7 +63,7 @@ export function LogEvent({ job, visit, onClose, onDone }: SheetProps & { visit: 
         </div>
       </Field>
       <Field label="What happened">
-        <textarea autoFocus rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Looked at kitchen and vestibule, nothing final, wants samples" />
+        <textarea autoFocus rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
       </Field>
       <NextStepFields value={step} onChange={setStep} />
       <ErrorLine error={error} />
@@ -125,7 +125,7 @@ export function ScheduleVisit({ job, onClose, onDone }: SheetProps) {
         </Field>
       )}
       <Field label="What for">
-        <input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Finish choosing the vestibule" />
+        <input value={purpose} onChange={(e) => setPurpose(e.target.value)} />
       </Field>
       <ErrorLine error={error} />
       <div className="actions">
@@ -285,7 +285,7 @@ export function HoldJob({ job, onClose, onDone }: SheetProps) {
     <Sheet title="Put the job on hold" onClose={onClose}>
       <p className="muted">Paused isn't stuck. On the date, the rep gets a check-in step.</p>
       <Field label="Come back on"><input type="date" value={until} onChange={(e) => setUntil(e.target.value)} /></Field>
-      <Field label="Why"><input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Not starting till spring" /></Field>
+      <Field label="Why"><input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
       <ErrorLine error={error} />
       <div className="actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>

@@ -113,7 +113,7 @@ export function NewJob() {
         }}
       >
         <Field label="Job name" hint="Whatever you heard — “Kisch – Mountain” is fine. Rename it when the address is confirmed.">
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Kisch – Mountain" />
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
 
         <fieldset>
@@ -160,7 +160,7 @@ export function NewJob() {
           </select>
         </Field>
         <Field label="What was said" hint="Optional. Saved as the first contact on the job.">
-          <textarea rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Rifky called: coming in with Kisch next week" />
+          <textarea rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} />
         </Field>
 
         <NextStepFields value={step} onChange={setStep} />

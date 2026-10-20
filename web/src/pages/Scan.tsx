@@ -86,9 +86,16 @@ function PickJob({ onPick }: { onPick: (id: number) => void }) {
   );
 }
 
+type Track = MediaStreamTrack;
+type Caps = { zoom?: { min: number; max: number }; torch?: boolean; focusMode?: string[] };
+const capsOf = (t: Track): Caps => (t.getCapabilities ? (t.getCapabilities() as unknown as Caps) : {});
+
 function Camera({ onCode }: { onCode: (code: string) => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const [state, setState] = useState<"starting" | "on" | "unsupported" | "denied">("starting");
+  const [track, setTrack] = useState<Track | null>(null);
+  const [zoom, setZoom] = useState<{ min: number; max: number; now: number } | null>(null);
+  const [torch, setTorch] = useState<boolean | null>(null);
   // Keep the latest callback without restarting the camera on every render.
   const handler = useRef(onCode);
   handler.current = onCode;
@@ -99,21 +106,49 @@ function Camera({ onCode }: { onCode: (code: string) => void }) {
       return;
     }
     const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+    // The middle of the picture, at full sensor detail: small tags read far better than from the whole frame.
+    const crop = document.createElement("canvas");
+    const ctx = crop.getContext("2d", { willReadFrequently: true });
     let stream: MediaStream | null = null;
     let stopped = false;
     let timer = 0;
+    let frame = 0;
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment" } })
+      .getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+      })
       .then(async (s) => {
         stream = s;
         if (!video.current || stopped) return;
+        const t = s.getVideoTracks()[0] as Track;
+        const caps = capsOf(t);
+        // Keep refocusing as the phone moves in and out.
+        if (caps.focusMode?.includes("continuous")) await t.applyConstraints({ advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] }).catch(() => {});
+        // A little zoom lets the phone stay far enough back to focus, while the tag still fills the box.
+        if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+          const start = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 2));
+          await t.applyConstraints({ advanced: [{ zoom: start } as MediaTrackConstraintSet] }).catch(() => {});
+          setZoom({ min: caps.zoom.min, max: Math.min(caps.zoom.max, 5), now: start });
+        }
+        if (caps.torch) setTorch(false);
+        setTrack(t);
         video.current.srcObject = s;
         await video.current.play();
         setState("on");
         const tick = async () => {
-          if (stopped || !video.current) return;
+          const v = video.current;
+          if (stopped || !v) return;
           try {
-            const codes = await detector.detect(video.current);
+            let source: CanvasImageSource = v;
+            // Every other look, read just the framed middle at full detail.
+            if (ctx && v.videoWidth && frame++ % 2 === 0) {
+              const side = Math.round(Math.min(v.videoWidth, v.videoHeight) * 0.6);
+              crop.width = crop.height = side;
+              ctx.drawImage(v, (v.videoWidth - side) / 2, (v.videoHeight - side) / 2, side, side, 0, 0, side, side);
+              source = crop;
+            }
+            const codes = await detector.detect(source);
             if (codes[0]?.rawValue) {
               stopped = true;
               navigator.vibrate?.(60);
@@ -123,7 +158,7 @@ function Camera({ onCode }: { onCode: (code: string) => void }) {
           } catch {
             /* frame not ready */
           }
-          timer = window.setTimeout(tick, 250);
+          timer = window.setTimeout(tick, 120);
         };
         tick();
       })
@@ -135,6 +170,26 @@ function Camera({ onCode }: { onCode: (code: string) => void }) {
     };
   }, []);
 
+  const setLevel = (now: number) => {
+    if (!track || !zoom) return;
+    track.applyConstraints({ advanced: [{ zoom: now } as MediaTrackConstraintSet] }).catch(() => {});
+    setZoom({ ...zoom, now });
+  };
+  const flipTorch = () => {
+    if (!track || torch === null) return;
+    track.applyConstraints({ advanced: [{ torch: !torch } as MediaTrackConstraintSet] }).catch(() => {});
+    setTorch(!torch);
+  };
+  // Tapping asks the camera to focus again.
+  const refocus = () => {
+    if (!track) return;
+    const caps = capsOf(track);
+    if (caps.focusMode?.includes("single-shot"))
+      track.applyConstraints({ advanced: [{ focusMode: "single-shot" } as MediaTrackConstraintSet] })
+        .then(() => caps.focusMode?.includes("continuous") && track.applyConstraints({ advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] }))
+        .catch(() => {});
+  };
+
   if (state === "unsupported")
     return (
       <p className="muted scan-desk-hint">
@@ -143,11 +198,25 @@ function Camera({ onCode }: { onCode: (code: string) => void }) {
     );
   if (state === "denied") return <p className="muted">The camera is blocked. Allow camera access for this app, or type the code below.</p>;
   return (
-    <div className="camera">
-      <video ref={video} playsInline muted aria-label="Camera" />
-      <div className="camera-frame" aria-hidden="true" />
-      {state === "starting" && <p className="muted">Starting the camera…</p>}
-    </div>
+    <>
+      <div className="camera" onClick={refocus}>
+        <video ref={video} playsInline muted aria-label="Camera" />
+        <div className="camera-frame" aria-hidden="true" />
+        {state === "starting" && <p className="muted">Starting the camera…</p>}
+      </div>
+      {(zoom || torch !== null) && (
+        <div className="camera-tools">
+          {zoom &&
+            [1, 2, 3, 4].filter((z) => z >= zoom.min && z <= zoom.max).map((z) => (
+              <button key={z} type="button" className={`btn btn-small ${Math.round(zoom.now) === z ? "btn-primary" : ""}`} onClick={() => setLevel(z)}>{z}×</button>
+            ))}
+          {torch !== null && (
+            <button type="button" className={`btn btn-small ${torch ? "btn-primary" : ""}`} onClick={flipTorch}>{torch ? "Light off" : "Light"}</button>
+          )}
+        </div>
+      )}
+      <p className="muted small camera-tip">Hold the tag inside the box, about a hand's length away. Tap the picture to refocus.</p>
+    </>
   );
 }
 
@@ -163,7 +232,7 @@ function ManualCode({ onCode }: { onCode: (code: string) => void }) {
     >
       <Field label="Scan with a USB scanner, or type the item number or tag link">
         <div className="inline">
-          <input autoFocus inputMode="url" value={code} onChange={(e) => setCode(e.target.value)} placeholder="10846" />
+          <input autoFocus inputMode="url" value={code} onChange={(e) => setCode(e.target.value)} />
           <button className="btn">Look up</button>
         </div>
       </Field>

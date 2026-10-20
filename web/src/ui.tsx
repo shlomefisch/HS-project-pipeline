@@ -116,7 +116,7 @@ export function NextStepFields({ value, onChange, heading = "Next step" }: { val
     <fieldset className="next-step">
       <legend>{heading}</legend>
       <Field label="What has to happen">
-        <input value={value.title} onChange={(e) => onChange({ ...value, title: e.target.value })} placeholder="Call Rifky about samples" />
+        <input value={value.title} onChange={(e) => onChange({ ...value, title: e.target.value })} />
       </Field>
       <UserSelect value={value.assignee_id} onChange={(id) => onChange({ ...value, assignee_id: id })} />
       <Field label="By when">

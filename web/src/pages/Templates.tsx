@@ -89,7 +89,7 @@ function StepSheet({ step, list, onClose, onDone }: { step: Partial<StepTemplate
     });
   return (
     <Sheet title={step.id ? "Edit step" : `New step — ${list.triggers[form.trigger]}`} onClose={onClose}>
-      <Field label="The step"><input autoFocus value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Send the welcome text" /></Field>
+      <Field label="The step"><input autoFocus value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
       <Field label="Who does it">
         <select value={form.assignee_kind} onChange={(e) => setForm({ ...form, assignee_kind: e.target.value as StepTemplate["assignee_kind"] })}>
           {Object.entries(list.assignee_kinds).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

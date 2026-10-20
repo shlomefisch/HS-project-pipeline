@@ -85,7 +85,7 @@ export function AwayOrGone({ id }: { id: number }) {
                 <Field label="Away from"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
                 <Field label="Back on"><input type="date" value={until} onChange={(e) => setUntil(e.target.value)} /></Field>
               </div>
-              <Field label="Note" hint="Optional."><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Vacation" /></Field>
+              <Field label="Note" hint="Optional."><input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
               <button
                 className="btn btn-primary"
                 disabled={busy || !cover}

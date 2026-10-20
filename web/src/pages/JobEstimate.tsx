@@ -151,7 +151,7 @@ function LineSheet({ line, onClose, onDone }: { line: EstimateLine; onClose: () 
       </Field>
       {changed && (
         <Field label="Why the change" hint="Optional — shows in the job's story.">
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Contractor deal" />
+          <input value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
       )}
       <ErrorLine error={error} />
@@ -177,7 +177,7 @@ function ByHandSheet({ est, onClose, onDone }: { est: Estimate; onClose: () => v
   return (
     <Sheet title="Entered in NetSuite by hand" onClose={onClose}>
       <p className="muted small">The estimate is in NetSuite already. It becomes an order here, and its areas move with the order from now on.</p>
-      <Field label="NetSuite estimate number" hint="Optional, but it helps find it later."><input autoFocus value={ref} onChange={(e) => setRef(e.target.value)} placeholder="EST-2201" /></Field>
+      <Field label="NetSuite estimate number" hint="Optional, but it helps find it later."><input autoFocus value={ref} onChange={(e) => setRef(e.target.value)} /></Field>
       <ErrorLine error={error} />
       <div className="actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>

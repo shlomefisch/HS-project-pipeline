@@ -110,7 +110,7 @@ export function Login({ onSignedIn }: { onSignedIn: (u: User) => void }) {
           }}
         >
           <Field label="Test sign-in (no password)" hint="On while DEV_LOGIN=1. Turn it off once your password works.">
-            <input type="email" value={devEmail} onChange={(e) => setDevEmail(e.target.value)} placeholder={`jay@${config.allowed_domain}`} />
+            <input type="email" value={devEmail} onChange={(e) => setDevEmail(e.target.value)} />
           </Field>
           <button className="btn btn-quiet" disabled={busy || !devEmail}>
             Test sign-in
