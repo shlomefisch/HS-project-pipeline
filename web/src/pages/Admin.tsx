@@ -29,7 +29,7 @@ export function Admin() {
     </li>
   );
   return (
-    <main className="page">
+    <main className="page team-page">
       <header className="page-head">
         <h1>Team</h1>
         <button className="btn btn-primary btn-small" onClick={() => setAdding(true)}>Add a person</button>

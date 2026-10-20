@@ -27,16 +27,34 @@ export function People() {
       ) : data.length === 0 ? (
         <Empty>{debounced ? "Nobody by that name, phone or email." : "No one yet."}</Empty>
       ) : (
-        <ul className="list">
-          {data.map((e) => (
-            <li key={e.id}>
-              <a className="row-link" href={`#/people/${e.id}`}>
-                <strong>{e.name}</strong>
-                <span className="muted">{[e.kind === "company" ? "Company" : null, e.phone, e.email].filter(Boolean).join(", ")}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="list only-phone">
+            {data.map((e) => (
+              <li key={e.id}>
+                <a className="row-link" href={`#/people/${e.id}`}>
+                  <strong>{e.name}</strong>
+                  <span className="muted">{[e.kind === "company" ? "Company" : null, e.phone, e.email].filter(Boolean).join(", ")}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          <table className="data-table only-desk">
+            <thead>
+              <tr><th>Name</th><th>Type</th><th>Phone</th><th>Email</th><th className="num">Open jobs</th></tr>
+            </thead>
+            <tbody>
+              {data.map((e) => (
+                <tr key={e.id} onClick={() => go(`people/${e.id}`)} className="clickable">
+                  <td><a href={`#/people/${e.id}`} onClick={(ev) => ev.stopPropagation()}><strong>{e.name}</strong></a></td>
+                  <td className="muted">{e.kind === "company" ? "Company" : "Person"}</td>
+                  <td>{e.phone ? <a href={`tel:${e.phone}`} onClick={(ev) => ev.stopPropagation()}>{e.phone}</a> : <span className="muted">—</span>}</td>
+                  <td>{e.email ? <a href={`mailto:${e.email}`} onClick={(ev) => ev.stopPropagation()}>{e.email}</a> : <span className="muted">—</span>}</td>
+                  <td className="num">{(e as Entity & { open_jobs?: number }).open_jobs ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
       {adding && (
         <Sheet title="Add someone" onClose={() => setAdding(false)}>

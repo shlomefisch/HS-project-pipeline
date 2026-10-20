@@ -135,7 +135,12 @@ function Camera({ onCode }: { onCode: (code: string) => void }) {
     };
   }, []);
 
-  if (state === "unsupported") return <p className="muted">This browser can't scan. Use Chrome on Android, or type the code below.</p>;
+  if (state === "unsupported")
+    return (
+      <p className="muted scan-desk-hint">
+        No camera scanning here. With a USB scanner, just scan the tag — it lands in the box below and looks itself up. Or type the item number.
+      </p>
+    );
   if (state === "denied") return <p className="muted">The camera is blocked. Allow camera access for this app, or type the code below.</p>;
   return (
     <div className="camera">
@@ -156,9 +161,9 @@ function ManualCode({ onCode }: { onCode: (code: string) => void }) {
         if (code.trim()) onCode(code);
       }}
     >
-      <Field label="Or type the item number or tag link">
+      <Field label="Scan with a USB scanner, or type the item number or tag link">
         <div className="inline">
-          <input inputMode="url" value={code} onChange={(e) => setCode(e.target.value)} placeholder="100101" />
+          <input autoFocus inputMode="url" value={code} onChange={(e) => setCode(e.target.value)} placeholder="10846" />
           <button className="btn">Look up</button>
         </div>
       </Field>

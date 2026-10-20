@@ -90,11 +90,11 @@ export function NewJob() {
   const ready = name.trim() && people.length > 0 && repId && classCode && step.title.trim();
 
   return (
-    <main className="page">
+    <main className="page page-form">
       <header className="page-head">
         <h1>New job</h1>
       </header>
-      <form
+      <form className="form-grid"
         onSubmit={(e) => {
           e.preventDefault();
           run(async () => {

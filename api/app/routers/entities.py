@@ -38,7 +38,17 @@ def search_entities(q: str = "", limit: int = 30, db: Session = Depends(get_db),
             stmt = stmt.order_by(func.similarity(Entity.name_norm, n).desc())
     else:
         stmt = stmt.order_by(Entity.created_at.desc())
-    return [entity_out(e) for e in db.scalars(stmt.limit(max(1, min(limit, 100))))]
+    found = list(db.scalars(stmt.limit(max(1, min(limit, 100)))))
+    # How many open jobs each is on right now: the number people ask about first.
+    from ..models import Job, JobRole
+
+    counts = dict(db.execute(
+        select(JobRole.entity_id, func.count(func.distinct(JobRole.job_id)))
+        .join(Job, Job.id == JobRole.job_id)
+        .where(JobRole.entity_id.in_([e.id for e in found]), JobRole.active.is_(True), Job.status.in_(("active", "on_hold")))
+        .group_by(JobRole.entity_id)
+    ).all()) if found else {}
+    return [{**entity_out(e), "open_jobs": counts.get(e.id, 0)} for e in found]
 
 
 @router.post("/check")
