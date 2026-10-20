@@ -322,3 +322,7 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .file-row { flex-wrap: wrap; }
 .file-main { flex: 1; }
 .needs-download { flex-basis: 100%; margin: 4px 0 0; }
+.pill-bad { background: var(--oxide-soft); color: var(--oxide); }
+.avail-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 10px 2px; flex-wrap: wrap; }
+.avail-main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.avail-actions { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }

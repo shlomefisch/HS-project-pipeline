@@ -277,6 +277,22 @@ class TagUpdate(_In):
     _s = field_validator("reason", mode="before")(_strip)
 
 
+class AvailOverride(_In):
+    reason: str
+
+    _s = field_validator("reason", mode="before")(_strip)
+
+
+class AvailConfirm(_In):
+    """Local supply: the supplier's answer. Overseas: the confirmed lead time."""
+
+    ok: bool
+    note: str | None = None
+    lead_time_weeks: int | None = Field(default=None, ge=0, le=104)
+
+    _s = field_validator("note", mode="before")(_strip)
+
+
 class SampleCreate(_In):
     description: str = Field(min_length=1)
     area_id: int | None = None

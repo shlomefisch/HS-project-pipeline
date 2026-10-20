@@ -173,6 +173,14 @@ class CandidateTag(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = _now()
+    avail_status: Mapped[str | None] = mapped_column(Text)
+    avail_lot: Mapped[str | None] = mapped_column(Text)
+    avail_free: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    avail_need: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    avail_note: Mapped[str | None] = mapped_column(Text)
+    avail_summary: Mapped[str | None] = mapped_column(Text)  # the story line, written by the check
+    avail_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    avail_checked_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class Sample(Base):

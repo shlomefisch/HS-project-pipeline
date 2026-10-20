@@ -11,6 +11,8 @@ from ..models import Area, Candidate, CandidateTag, Item, Sample, User
 from ..rules.qr import parse_item_code
 from ..schemas import (
     AreaCreate,
+    AvailConfirm,
+    AvailOverride,
     AreaUpdate,
     CandidateCreate,
     CandidateUpdate,
@@ -184,6 +186,58 @@ def remove_tag(tag_id: int, db: Session = Depends(get_db), _: User = Depends(wri
     db.delete(tag)
     db.commit()
     return {"ok": True}
+
+
+# -------------------------------------------------------- availability
+def _tag(db: Session, tag_id: int) -> CandidateTag:
+    tag = db.get(CandidateTag, tag_id)
+    if tag is None:
+        raise HTTPException(404, "Not found.")
+    return tag
+
+
+def _live_stock(item_id: int) -> dict:
+    from ..config import settings
+    from ..netsuite import NetSuiteError
+    from ..services import stock
+    from ..services.item_sync import client_from_settings
+
+    if not settings.netsuite_configured:
+        raise HTTPException(409, "NetSuite isn't connected, so stock can't be checked.")
+    try:
+        return stock.get(client_from_settings, item_id, fresh=True)
+    except NetSuiteError as exc:
+        raise HTTPException(502, f"Couldn't get stock from NetSuite. {exc}") from exc
+
+
+@router.post("/tags/{tag_id}/availability/check")
+def check_availability(tag_id: int, db: Session = Depends(get_db), user: User = Depends(writer)):
+    """Our stock, live: one lot covering the need, or not."""
+    from ..services import availability
+
+    tag = availability.check_stock(db, _tag(db, tag_id), user, _live_stock)
+    db.commit()
+    return row(tag)
+
+
+@router.post("/tags/{tag_id}/availability/two-lots")
+def go_ahead_on_two_lots(tag_id: int, body: AvailOverride, db: Session = Depends(get_db), user: User = Depends(writer)):
+    """The rep's call, with a reason. No customer sign-off needed."""
+    from ..services import availability
+
+    tag = availability.override_two_lots(db, _tag(db, tag_id), user, body.reason or "")
+    db.commit()
+    return row(tag)
+
+
+@router.post("/tags/{tag_id}/availability/confirm")
+def confirm_availability(tag_id: int, body: AvailConfirm, db: Session = Depends(get_db), user: User = Depends(writer)):
+    """Local supply: the supplier's answer. Overseas: the lead time."""
+    from ..services import availability
+
+    tag = availability.confirm_outside(db, _tag(db, tag_id), user, body.ok, body.note, body.lead_time_weeks)
+    db.commit()
+    return row(tag)
 
 
 # ------------------------------------------------------------- samples

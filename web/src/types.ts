@@ -67,12 +67,20 @@ export interface Tag {
   unit: string;
   reason: string | null;
   decided_at: string | null;
+  avail_status?: "available" | "two_lots" | "override" | "short" | "confirmed" | null;
+  avail_lot?: string | null;
+  avail_free?: number | null;
+  avail_need?: number | null;
+  avail_note?: string | null;
+  avail_summary?: string | null;
+  avail_checked_at?: string | null;
 }
 
 export interface Item {
   netsuite_id: number;
   name: string;
   sku: string | null;
+  unit?: string | null;
   size: string | null;
   finish: string | null;
   is_lot?: boolean;

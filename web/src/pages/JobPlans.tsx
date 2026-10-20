@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { niceDate, plusDays, useApp, useLoad } from "../state";
+import { niceDate, niceTime, plusDays, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Sheet, UserSelect, useAction } from "../ui";
-import type { AppSettings, Area, Job, JobFile } from "../types";
+import type { AppSettings, Area, Candidate, Job, JobFile, Tag } from "../types";
 
 const KIND_LABEL: Record<JobFile["kind"], string> = { plan: "Plans", photo: "Photos", note: "Notes", other: "Other" };
 const SOURCE_LABEL: Record<string, string> = { customer: "Customer", designer: "Designer", installer: "Installer", takeoff: "Our takeoff" };
@@ -66,6 +66,9 @@ export function Plans({ job, reload }: { job: Job; reload: () => void }) {
           </ul>
         )}
       </section>
+
+      {/* ---- availability ---- */}
+      <Availability job={job} reload={reload} />
 
       {/* ---- takeoff ---- */}
       <section className="section">
@@ -358,6 +361,125 @@ function TakeoffSheet({ job, onClose, onDone }: { job: Job; onClose: () => void;
         <button className="btn btn-primary" disabled={busy || !who} onClick={() => run(async () => { await api.post(`/jobs/${job.id}/takeoff`, { assignee_id: who, due_date: due, notes: notes || null }); onDone(); })}>
           Send for takeoff
         </button>
+      </div>
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------- availability
+const AVAIL: Record<string, { label: string; cls: string }> = {
+  available: { label: "Available", cls: "pill-ok" },
+  override: { label: "OK on two lots", cls: "pill-ok" },
+  confirmed: { label: "Confirmed", cls: "pill-ok" },
+  two_lots: { label: "Two lots only", cls: "pill-warn" },
+  short: { label: "Short", cls: "pill-bad" },
+};
+
+function Availability({ job, reload }: { job: Job; reload: () => void }) {
+  const { me } = useApp();
+  const [sheet, setSheet] = useState<null | { kind: "two_lots" | "confirm"; tag: Tag; cand: Candidate }>(null);
+  const { busy, error, run } = useAction();
+  const areas = new Map(job.areas.map((a) => [a.id, a]));
+  const lines = job.candidates.flatMap((c) =>
+    c.tags.filter((t) => t.status === "chosen" && ["open", "decided"].includes(areas.get(t.area_id)?.status ?? "")).map((t) => ({ c, t, a: areas.get(t.area_id)! })),
+  );
+  const isRep = me.id === job.rep_id || me.is_admin || me.role === "management";
+  const open = lines.filter(({ t }) => !["available", "override", "confirmed"].includes(t.avail_status ?? ""));
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h2>Availability</h2>
+        {lines.length > 0 && <span className="muted small">{open.length ? `${open.length} to sort out` : "All set"}</span>}
+      </div>
+      <p className="muted small">Our stock counts only if one lot covers it. Local: call the supplier. Overseas: confirm the lead time.</p>
+      {lines.length === 0 ? (
+        <Empty>Choose tiles for the areas on the Selection tab first.</Empty>
+      ) : (
+        <ul className="list">
+          {lines.map(({ c, t, a }) => {
+            const need = t.quantity ?? a.footage;
+            const stale = t.avail_status && c.source === "stock" && t.avail_need != null && need != null && Number(t.avail_need) !== Number(need);
+            const st = t.avail_status ? AVAIL[t.avail_status] : null;
+            return (
+              <li key={t.id} className="avail-row">
+                <div className="avail-main">
+                  <strong>{c.display_name}</strong>
+                  <span className="muted small">
+                    {a.name}{need != null ? ` · needs ${sf(need)} sf` : " · no footage yet"} · {c.source === "stock" ? "our stock" : c.source === "local" ? `local${c.supplier ? `, ${c.supplier}` : ""}` : `overseas${c.supplier ? `, ${c.supplier}` : ""}`}
+                  </span>
+                  {st && <span><span className={`pill ${st.cls}`}>{st.label}</span>{t.avail_lot && <span className="muted small"> lot {t.avail_lot}</span>}{t.avail_checked_at && <span className="muted small"> · {niceDate(t.avail_checked_at)} {niceTime(t.avail_checked_at)}</span>}</span>}
+                  {t.avail_summary && <span className="small">{t.avail_summary.replace(/^.*? — /, "")}</span>}
+                  {stale && <span className="stock-warn">The quantity changed since this check — check again.</span>}
+                </div>
+                <div className="avail-actions">
+                  {c.source === "stock" ? (
+                    <button className="btn btn-small" disabled={busy || need == null} onClick={() => run(async () => { await api.post(`/tags/${t.id}/availability/check`); reload(); })}>
+                      {t.avail_status ? "Check again" : "Check"}
+                    </button>
+                  ) : (
+                    <button className="btn btn-small" disabled={busy} onClick={() => setSheet({ kind: "confirm", tag: t, cand: c })}>
+                      {c.source === "overseas" ? "Confirm lead time" : "Supplier's answer"}
+                    </button>
+                  )}
+                  {t.avail_status === "two_lots" && isRep && (
+                    <button className="btn btn-quiet btn-small" disabled={busy} onClick={() => setSheet({ kind: "two_lots", tag: t, cand: c })}>Go ahead on two lots</button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <ErrorLine error={error} />
+      {sheet?.kind === "two_lots" && <TwoLotsSheet tag={sheet.tag} cand={sheet.cand} onClose={() => setSheet(null)} onDone={() => { setSheet(null); reload(); }} />}
+      {sheet?.kind === "confirm" && <ConfirmSheet tag={sheet.tag} cand={sheet.cand} onClose={() => setSheet(null)} onDone={() => { setSheet(null); reload(); }} />}
+    </section>
+  );
+}
+
+function TwoLotsSheet({ tag, cand, onClose, onDone }: { tag: Tag; cand: Candidate; onClose: () => void; onDone: () => void }) {
+  const [reason, setReason] = useState("");
+  const { busy, error, run } = useAction();
+  return (
+    <Sheet title="Go ahead on two lots" onClose={onClose}>
+      <p>{cand.display_name}: no single lot covers it. Two lots can differ in shade — it's your call.</p>
+      <Field label="Why it's fine" hint="Logged on the job. No customer sign-off needed.">
+        <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Two separate rooms — the lots won't meet" />
+      </Field>
+      <ErrorLine error={error} />
+      <div className="actions">
+        <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={busy || !reason.trim()} onClick={() => run(async () => { await api.post(`/tags/${tag.id}/availability/two-lots`, { reason }); onDone(); })}>Go ahead</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function ConfirmSheet({ tag, cand, onClose, onDone }: { tag: Tag; cand: Candidate; onClose: () => void; onDone: () => void }) {
+  const overseas = cand.source === "overseas";
+  const [weeks, setWeeks] = useState(cand.lead_time_weeks != null ? String(cand.lead_time_weeks) : "");
+  const [note, setNote] = useState("");
+  const { busy, error, run } = useAction();
+  const send = (ok: boolean) =>
+    run(async () => {
+      await api.post(`/tags/${tag.id}/availability/confirm`, { ok, note: note || null, lead_time_weeks: overseas && weeks ? Number(weeks) : null });
+      onDone();
+    });
+  return (
+    <Sheet title={overseas ? "Confirm the lead time" : "What the supplier said"} onClose={onClose}>
+      <p className="muted">{cand.display_name}{cand.supplier ? ` — ${cand.supplier}` : ""}</p>
+      {overseas && (
+        <Field label="Lead time, in weeks">
+          <input inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value.replace(/\D/g, ""))} />
+        </Field>
+      )}
+      <Field label="Note" hint={overseas ? "Optional — e.g. ships from Italy on the 3rd." : "Required if they're short."}>
+        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={overseas ? "" : "Out until December"} />
+      </Field>
+      <ErrorLine error={error} />
+      <div className="actions actions-wrap">
+        <button className="btn" disabled={busy || !note.trim()} onClick={() => send(false)}>{overseas ? "Not possible" : "They're short"}</button>
+        <button className="btn btn-primary" disabled={busy || (overseas && !weeks)} onClick={() => send(true)}>{overseas ? "Lead time confirmed" : "They have it"}</button>
       </div>
     </Sheet>
   );
