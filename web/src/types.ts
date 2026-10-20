@@ -266,3 +266,34 @@ export interface AppSettings {
   takeoff_user_id: number | null;
   takeoff_user: User | null;
 }
+
+export interface EstimateLine {
+  id: number;
+  estimate_id: number;
+  tag_id: number | null;
+  area_id: number | null;
+  netsuite_item_id: number | null;
+  description: string;
+  quantity: number | null;
+  unit: string | null;
+  base_price: number | null;
+  price: number | null;
+  price_note: string | null;
+  overridden: boolean;
+  amount: number | null;
+}
+
+export interface Estimate {
+  id: number;
+  job_id: number;
+  status: "draft" | "pushed" | "discarded";
+  note: string | null;
+  created_at: string;
+  created_by: number | null;
+  pushed_at: string | null;
+  netsuite_estimate_id: number | null;
+  area_ids: number[];
+  lines: EstimateLine[];
+  total: number;
+  warnings: string[];
+}

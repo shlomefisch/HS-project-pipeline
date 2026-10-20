@@ -297,6 +297,42 @@ class FileBlob(Base):
     data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
+class Estimate(Base):
+    __tablename__ = "estimates"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
+    status: Mapped[str] = mapped_column(Text, default="draft")
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    netsuite_estimate_id: Mapped[int | None] = mapped_column(Integer)
+
+
+class EstimateArea(Base):
+    __tablename__ = "estimate_areas"
+    estimate_id: Mapped[int] = mapped_column(ForeignKey("estimates.id"), primary_key=True)
+    area_id: Mapped[int] = mapped_column(ForeignKey("areas.id"), primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
+
+
+class EstimateLine(Base):
+    __tablename__ = "estimate_lines"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    estimate_id: Mapped[int] = mapped_column(ForeignKey("estimates.id"))
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
+    tag_id: Mapped[int | None] = mapped_column(ForeignKey("candidate_tags.id"))
+    area_id: Mapped[int | None] = mapped_column(ForeignKey("areas.id"))
+    netsuite_item_id: Mapped[int | None] = mapped_column(Integer)
+    description: Mapped[str] = mapped_column(Text)
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    unit: Mapped[str | None] = mapped_column(Text)
+    base_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    price: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    price_note: Mapped[str | None] = mapped_column(Text)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_log"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

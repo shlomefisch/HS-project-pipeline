@@ -110,6 +110,20 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
             return f"Area renamed from {old} to {new}"
         return None
 
+    if table == "estimates":
+        if action == "insert":
+            return "Estimate started"
+        if changed("status"):
+            return {"discarded": "Estimate discarded", "pushed": "Estimate sent to NetSuite"}.get(g("status"))
+        return None
+
+    if table == "estimate_lines" and action == "update" and changed("price"):
+        old, new = changes["price"]
+        base = g("base_price")
+        if base is not None and str(new) != str(base):
+            return f"Price changed on {g('description')}: {float(new):,.2f} (Base Price {float(base):,.2f})" + (f" — {g('price_note')}" if g("price_note") else "")
+        return f"Price on {g('description')}: {float(new):,.2f}" if new is not None else None
+
     if table == "job_files":
         label = {"plan": "Plan", "photo": "Photo", "note": "Note", "other": "File"}.get(g("kind"), "File")
         if action == "insert":

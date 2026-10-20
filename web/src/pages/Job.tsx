@@ -6,9 +6,10 @@ import type { AuditEntry, Job, Task, Visit } from "../types";
 import { CompleteTask } from "./TaskActions";
 import { Selection } from "./JobSelection";
 import { Plans } from "./JobPlans";
+import { EstimateTab } from "./JobEstimate";
 import { AddTask, EditJob, HoldJob, LogEvent, LoseJob, ResolveVisit, ReviveJob, ScheduleVisit } from "./JobSheets";
 
-type Tab = "selection" | "plans" | "steps" | "people" | "story";
+type Tab = "selection" | "plans" | "estimate" | "steps" | "people" | "story";
 type SheetKind = null | "log" | "schedule" | "task" | "edit" | "hold" | "lose" | "revive" | "more";
 
 export function JobPage({ id }: { id: number }) {
@@ -80,6 +81,7 @@ export function JobPage({ id }: { id: number }) {
           [
             ["selection", "Selection"],
             ["plans", "Plans"],
+            ["estimate", "Estimate"],
             ["steps", `Steps ${job.open_tasks ? `(${job.open_tasks})` : ""}`],
             ["people", "People"],
             ["story", "Story"],
@@ -93,6 +95,7 @@ export function JobPage({ id }: { id: number }) {
 
       {tab === "selection" && <Selection job={job} reload={reload} />}
       {tab === "plans" && <Plans job={job} reload={reload} />}
+      {tab === "estimate" && <EstimateTab job={job} reload={reload} />}
       {tab === "steps" && <Steps job={job} reload={reload} onLogVisit={(v) => { setLogVisit(v); setSheet("log"); }} />}
       {tab === "people" && <People job={job} reload={reload} />}
       {tab === "story" && <Story jobId={job.id} />}

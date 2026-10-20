@@ -293,6 +293,21 @@ class AvailConfirm(_In):
     _s = field_validator("note", mode="before")(_strip)
 
 
+class EstimateCreate(_In):
+    area_ids: list[int] = Field(min_length=1)
+    note: str | None = None
+
+    _s = field_validator("note", mode="before")(_strip)
+
+
+class EstimateLineUpdate(_In):
+    quantity: Decimal | None = Field(default=None, gt=0)
+    price: Decimal | None = Field(default=None, ge=0)
+    price_note: str | None = None
+
+    _s = field_validator("price_note", mode="before")(_strip)
+
+
 class SampleCreate(_In):
     description: str = Field(min_length=1)
     area_id: int | None = None
