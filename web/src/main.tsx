@@ -13,6 +13,8 @@ import { Scan } from "./pages/Scan";
 import { People, PersonPage } from "./pages/People";
 import { Admin } from "./pages/Admin";
 import { forgetThisPhone } from "./notify";
+import { OfflineBar } from "./OfflineBar";
+import { forgetAll } from "./offline";
 import { AwayOrGone } from "./pages/AwayOrGone";
 import { Templates } from "./pages/Templates";
 
@@ -27,9 +29,14 @@ function Root() {
     setMe(null);
   }, []);
 
+  // A deliberate sign-out also clears what this phone remembers, so the next person sees none of it.
+
   // The Sign out button: forget this phone for notifications while the session still works, then clear it.
   const signOut = useCallback(() => {
-    forgetThisPhone().finally(dropSession);
+    forgetThisPhone().finally(() => {
+      forgetAll();
+      dropSession();
+    });
   }, [dropSession]);
 
   useEffect(() => {
@@ -94,6 +101,7 @@ function Shell({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: User) => 
 
   return (
     <div className="shell">
+      <OfflineBar />
       {page}
       <nav className="tabbar" aria-label="Main">
         {tab("today", "Today")}

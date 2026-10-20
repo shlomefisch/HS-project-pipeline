@@ -30,6 +30,10 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Project Pipeline", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=lifespan)
 
+from .idempotency import IdempotencyMiddleware  # noqa: E402
+
+app.add_middleware(IdempotencyMiddleware)
+
 for r in (meta, auth, users, entities, jobs, selection, plans, estimates, timeline, tasks, dashboard, sync, team, push, templates):
     app.include_router(r.router, prefix="/api")
 

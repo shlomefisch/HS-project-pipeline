@@ -372,3 +372,12 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .bar { height: 10px; background: var(--grout); border-radius: 5px; overflow: hidden; }
 .bar span { display: block; height: 100%; background: var(--slate); }
 .bar-n { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Offline bar */
+.offline-bar { position: sticky; top: 0; z-index: 30; background: var(--slate); color: var(--porcelain); padding: 0 16px; }
+.offline-bar.has-failed { background: var(--oxide); }
+.offline-head { background: none; border: 0; color: inherit; font: inherit; font-weight: 600; font-size: 0.9rem; padding: 10px 0; width: 100%; text-align: left; cursor: pointer; }
+.offline-list { padding-bottom: 10px; }
+.offline-list p { margin: 4px 0; }
+.offline-list .muted { color: var(--grout); }
+.offline-list .btn { background: var(--porcelain); color: var(--slate); }

@@ -44,6 +44,9 @@ def _absence_loop() -> None:
                 if absences.apply_due(db):
                     log.info("aways started/ended")
                 db.commit()
+                from .idempotency import prune
+
+                prune()
         except Exception:
             log.exception("away check failed")
             db.rollback()

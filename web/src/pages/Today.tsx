@@ -6,6 +6,7 @@ import type { Job, Task, User, Visit } from "../types";
 import { ChangePasswordSheet } from "./Login";
 import { NotificationsBox } from "../notify";
 import { Overview } from "./Overview";
+import { waiting } from "../offline";
 import { CompleteTask } from "./TaskActions";
 
 interface RepView {
@@ -25,6 +26,7 @@ interface OfficeView {
 export function Today({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: User) => void }) {
   const { me, toast } = useApp();
   const [pwOpen, setPwOpen] = useState(false);
+  const [confirmOut, setConfirmOut] = useState(false);
   const boss = me.is_admin || me.role === "management";
   const [view, setView] = useState<"rep" | "office" | "overview">(me.role === "rep" ? "rep" : boss ? "overview" : "office");
   return (
@@ -52,8 +54,15 @@ export function Today({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: Us
         <button className="btn btn-small btn-quiet" onClick={() => setPwOpen(true)}>
           {me.has_password === false ? "Set password" : "Change password"}
         </button>
-        <button className="btn btn-small btn-quiet" onClick={onSignOut}>
-          Sign out
+        <button
+          className="btn btn-small btn-quiet"
+          onClick={() => {
+            const n = waiting().length;
+            if (n && !confirmOut) return setConfirmOut(true);
+            onSignOut();
+          }}
+        >
+          {confirmOut ? `Sign out — ${waiting().length} unsent save(s) will be lost` : "Sign out"}
         </button>
       </footer>
       {pwOpen && (

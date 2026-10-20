@@ -1,4 +1,5 @@
 // Thin client for the API. Every rule lives on the server; this only carries requests.
+import { cacheable, flush, hold, isOffline, newKey, queueLabel, recall, remember, setOffline, waiting, type Waiting } from "./offline";
 
 const TOKEN_KEY = "pipeline.token";
 
@@ -46,35 +47,81 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
+async function send(method: string, url: string, body: unknown, key?: string): Promise<Response> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (key) headers["Idempotency-Key"] = key;
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
+  return fetch(url, { method, headers, body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body) });
+}
+
+async function parse(res: Response): Promise<unknown> {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown, params?: Record<string, unknown>): Promise<T> {
-  let url = `/api${path}`;
+  let rel = path;
   if (params) {
     const q = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
     const s = q.toString();
-    if (s) url += `?${s}`;
+    if (s) rel += `?${s}`;
   }
-  const headers: Record<string, string> = {};
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
-  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
+  const url = `/api${rel}`;
+  const label = method !== "GET" ? queueLabel(method, path) : null;
 
+  // Keep the order: if saves are already waiting, this one waits behind them.
+  if (label && waiting().length > 0) {
+    hold(method, rel, body, label);
+    void flushOutbox();
+    return null as T;
+  }
+
+  const key = label ? newKey() : undefined;
   let res: Response;
   try {
-    res = await fetch(url, { method, headers, body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body) });
+    res = await send(method, url, body, key);
   } catch {
-    throw new ApiError(0, "No connection. Check the signal and try again.", null);
+    setOffline(true);
+    if (label) {
+      hold(method, rel, body, label, key);
+      return null as T; // saved on the phone; the bar says it's waiting
+    }
+    if (method === "GET" && cacheable(rel)) {
+      const old = recall<T>(rel);
+      if (old !== undefined) return old;
+    }
+    throw new ApiError(0, "No signal. Saves wait on this phone; this screen needs a connection.", null);
   }
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  setOffline(false);
+  const data = (await parse(res)) as { detail?: unknown } | null;
   if (!res.ok) {
     if (res.status === 401) onUnauthorized();
     const detail = data?.detail ?? data;
     throw new ApiError(res.status, messageFrom(detail), detail);
   }
+  if (method === "GET" && cacheable(rel)) remember(rel, data);
+  if (waiting().length) void flushOutbox();
   return data as T;
 }
+
+/** Sends what's waiting on this phone. Safe to call any time. */
+export function flushOutbox(): Promise<void> {
+  return flush(async (w: Waiting) => {
+    const res = await send(w.method, `/api${w.path}`, w.body, w.id);
+    const data = (await parse(res)) as { detail?: unknown } | null;
+    return { ok: res.ok, status: res.status, message: res.ok ? "" : messageFrom(data?.detail ?? data) };
+  });
+}
+
+export { isOffline };
 
 export const api = {
   get: <T>(path: string, params?: Record<string, unknown>) => request<T>("GET", path, undefined, params),

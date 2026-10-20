@@ -26,6 +26,8 @@ stalls because nobody knew it was their turn.
 
 **Management overview** (Today → Everyone, management and admins): totals, people most behind first, jobs gone quiet for 14 days, jobs by department, loss reasons over 90 days, who is away.
 
+**Offline:** field saves (log what happened, steps, tiles, areas, footage, samples, visits) made without signal wait on the phone and send in order when it returns; each carries a one-time Idempotency-Key so a resend is never applied twice (answers kept 14 days). Screens last opened stay readable offline. Uploads, sign-in, new jobs/people and admin stay online-only.
+
 **Not yet:** the NetSuite push and read-back,  footage and availability, offline queue.
 The item list is a stand-in table until the sync exists.
 
