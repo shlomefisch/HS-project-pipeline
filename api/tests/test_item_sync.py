@@ -105,3 +105,18 @@ def test_row_mapping():
         "is_stock": True, "unit_id": 1, "unit": "SF",
     }
     assert item_sync.to_item({"id": "6", "itemid": None, "displayname": None})["name"] == "Item #6"
+
+
+def test_photos_come_along_when_netsuite_shares_them(client, jay):
+    class WithPhotos(FakeNetSuite):
+        keys = type("K", (), {"account": "5032967"})()
+
+        def page(self, sql, limit=1000, offset=0):
+            if "FROM file f" in sql:
+                return [{"id": "2164930", "url": "/core/media/media.nl?id=2164930&c=5032967&h=abc"}], False
+            return super().page(sql, limit, offset)
+
+    row = {**ns(10846, "ABK.SN.WM.2448.ANT", "ABK Sensi"), "imageref": "2164930"}
+    item_sync.run(_engine(), WithPhotos([row]))
+    item = jay.get("/api/items", params={"q": "sensi"}).json()[0]
+    assert item["image_url"] == "https://5032967.app.netsuite.com/core/media/media.nl?id=2164930&c=5032967&h=abc"

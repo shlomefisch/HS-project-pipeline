@@ -129,6 +129,7 @@ class Item(Base):
     is_stock: Mapped[bool] = mapped_column(Boolean, default=False)  # NetSuite custitem4
     unit: Mapped[str | None] = mapped_column(Text)
     unit_id: Mapped[int | None] = mapped_column(Integer)
+    image_file_id: Mapped[int | None] = mapped_column(Integer)  # NetSuite file cabinet id
     synced_at: Mapped[datetime] = _now()
 
 

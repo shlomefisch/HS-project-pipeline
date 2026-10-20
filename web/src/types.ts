@@ -81,6 +81,7 @@ export interface Item {
   name: string;
   sku: string | null;
   unit?: string | null;
+  image_url?: string | null;
   size: string | null;
   finish: string | null;
   is_lot?: boolean;

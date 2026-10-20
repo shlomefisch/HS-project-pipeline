@@ -9,7 +9,7 @@ Upserts are idempotent, so overlapping windows are harmless.
 import logging
 from datetime import timedelta
 
-from sqlalchemy import Engine, func, insert, select, text, update
+from sqlalchemy import Engine, case, func, insert, literal, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..config import settings
@@ -44,6 +44,46 @@ UNIT_SQL = "SELECT u.internalid AS id, u.abbreviation AS abbr, u.unitname AS nam
 
 # The unit field: baseunit if NetSuite lets queries read it, else stockunit.
 UNIT_FIELDS = ("baseunit", "stockunit")
+
+
+PHOTO_FIELD = "custitem_atlas_item_image_2"
+
+
+def photo_field_readable(client) -> bool:
+    try:
+        client.page(f"SELECT item.id, item.{PHOTO_FIELD} FROM item WHERE item.itemtype = 'InvtPart'", limit=1)
+        return True
+    except NetSuiteError as exc:
+        log.warning("photo field not readable: %s", exc)
+        return False
+
+
+def resolve_photos(engine, client, keys) -> int:
+    """Looks up the web address of each new photo file. A file NetSuite won't
+    show us just stays without a picture; the sync carries on either way."""
+    items = Item.__table__
+    with engine.connect() as c:
+        todo = [r[0] for r in c.execute(
+            select(items.c.image_file_id).where(items.c.image_file_id.is_not(None), items.c.image_url.is_(None)).distinct()
+        )]
+    host = f"https://{keys.account.lower().replace('_', '-')}.app.netsuite.com" if keys else ""
+    found = 0
+    for i in range(0, len(todo), 200):
+        batch = todo[i:i + 200]
+        try:
+            rows, _ = client.page(f"SELECT f.id AS id, f.url AS url FROM file f WHERE f.id IN ({', '.join(str(int(x)) for x in batch)})")
+        except NetSuiteError as exc:
+            log.warning("photo addresses unavailable: %s", exc)
+            return found
+        with engine.begin() as c:
+            for r in rows:
+                url = (r.get("url") or "").strip()
+                if not url:
+                    continue
+                full = url if url.startswith("http") else host + url
+                c.execute(update(items).where(items.c.image_file_id == int(r["id"])).values(image_url=full))
+                found += 1
+    return found
 
 
 def pick_unit_field(client) -> str | None:
@@ -97,6 +137,7 @@ def to_item(r: dict, units: dict[int, str] | None = None) -> dict:
     display = (r.get("displayname") or "").strip()
     name = display or code or f"Item #{r['id']}"
     unit_id = _int(r.get("unitref", r.get("stockunit")))
+    image_id = _int(r.get("imageref"))
     return {
         "netsuite_id": int(r["id"]),
         "name": name,
@@ -106,6 +147,7 @@ def to_item(r: dict, units: dict[int, str] | None = None) -> dict:
         "is_stock": r.get("custitem4") == "T",
         "unit_id": unit_id,
         "unit": (units or {}).get(unit_id) if unit_id is not None else None,
+        "image_file_id": image_id,
     }
 
 
@@ -155,6 +197,9 @@ def _run_locked(engine: Engine, client: SuiteQL | None, requested: str | None, u
         unit_field = pick_unit_field(client)
         units = unit_names(client, unit_field)
         item_sql = ITEM_SQL if unit_field else ITEM_SQL.replace(", item.{unit_field} AS unitref", "")
+        photos = photo_field_readable(client)
+        if photos:
+            item_sql = item_sql.replace(" FROM item WHERE", f", item.{PHOTO_FIELD} AS imageref FROM item WHERE", 1)
         for page in client.by_id(lambda after: item_sql.format(after=after, since=since, unit_field=unit_field)):
             rows = [to_item(r, units) for r in page]
             stmt = pg_insert(items).values(rows)
@@ -169,6 +214,12 @@ def _run_locked(engine: Engine, client: SuiteQL | None, requested: str | None, u
                     "unit_id": stmt.excluded.unit_id,
                     # Keep a known label if this run couldn't read unit names.
                     "unit": func.coalesce(stmt.excluded.unit, items.c.unit),
+                    # A new photo file means its address has to be looked up again.
+                    "image_file_id": func.coalesce(stmt.excluded.image_file_id, items.c.image_file_id) if not photos else stmt.excluded.image_file_id,
+                    "image_url": case(
+                        (items.c.image_file_id.is_distinct_from(stmt.excluded.image_file_id) if photos else literal(False), None),
+                        else_=items.c.image_url,
+                    ),
                     "synced_at": func.now(),
                 },
             )
@@ -176,6 +227,7 @@ def _run_locked(engine: Engine, client: SuiteQL | None, requested: str | None, u
                 conn.execute(stmt)
                 seen += len(rows)
                 conn.execute(update(runs).where(runs.c.id == run_id).values(rows_seen=seen))
+        photo_urls = resolve_photos(engine, client, getattr(client, "keys", None)) if photos else 0
         retired = 0
         if mode == "full":
             with engine.begin() as conn:
@@ -185,7 +237,7 @@ def _run_locked(engine: Engine, client: SuiteQL | None, requested: str | None, u
                 ).rowcount
         with engine.begin() as conn:
             conn.execute(update(runs).where(runs.c.id == run_id).values(status="ok", finished_at=now(), rows_seen=seen))
-        log.info("item sync %s ok: %s rows, %s retired", mode, seen, retired)
+        log.info("item sync %s ok: %s rows, %s retired, %s photo addresses", mode, seen, retired, photo_urls)
         return {"status": "ok", "mode": mode, "rows": seen, "retired": retired}
     except Exception as exc:  # recorded for the Team screen, never crashes the server
         message = str(exc) if isinstance(exc, NetSuiteError) else f"{type(exc).__name__}: {exc}"

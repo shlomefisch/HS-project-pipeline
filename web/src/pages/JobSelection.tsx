@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Photo } from "../photo";
 import { api } from "../api";
 import { go, niceDate, niceTime, plusDays, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Sheet, useAction } from "../ui";
@@ -63,7 +64,9 @@ export function Selection({ job, reload }: { job: Job; reload: () => void }) {
               <ul className="tile-lines">
                 {rows.map(({ c, t }) => (
                   <li key={t.id}>
-                    <button className={`tile-line tag-${t.status}`} onClick={() => setTagSheet({ tag: t, cand: c })}>
+                    <button className={`tile-line tile-line-photo tag-${t.status}`} onClick={() => setTagSheet({ tag: t, cand: c })}>
+                      <Photo url={c.item?.image_url} />
+                      <span className="tile-text">
                       <span className="tile-name">{c.display_name}</span>
                       <span className="tile-meta">
                         {SOURCE_SHORT[c.source]}
@@ -72,6 +75,7 @@ export function Selection({ job, reload }: { job: Job; reload: () => void }) {
                         {t.status === "chosen" ? ", chosen" : ""}
                         {t.status === "declined" && t.reason ? `, ${t.reason}` : ""}
                       </span>
+                    </span>
                     </button>
                   </li>
                 ))}
@@ -87,9 +91,12 @@ export function Selection({ job, reload }: { job: Job; reload: () => void }) {
           <ul className="tile-lines">
             {untagged.map((c) => (
               <li key={c.id}>
-                <button className="tile-line" onClick={() => setTagSheet({ tag: { id: 0, candidate_id: c.id, area_id: 0, status: "considering", quantity: null, unit: "sf", reason: null, decided_at: null }, cand: c })}>
-                  <span className="tile-name">{c.display_name}</span>
-                  <span className="tile-meta">{SOURCE_SHORT[c.source]}</span>
+                <button className="tile-line tile-line-photo" onClick={() => setTagSheet({ tag: { id: 0, candidate_id: c.id, area_id: 0, status: "considering", quantity: null, unit: "sf", reason: null, decided_at: null }, cand: c })}>
+                  <Photo url={c.item?.image_url} />
+                  <span className="tile-text">
+                    <span className="tile-name">{c.display_name}</span>
+                    <span className="tile-meta">{SOURCE_SHORT[c.source]}</span>
+                  </span>
                 </button>
               </li>
             ))}
@@ -207,9 +214,12 @@ export function AddTile({ job, onClose, onDone, scanned }: { job: Job; onClose: 
             <ul className="list">
               {results.map((i) => (
                 <li key={i.netsuite_id}>
-                  <button className="row-btn" onClick={() => setItem({ id: i.netsuite_id, name: i.name })}>
-                    <strong>{i.name}</strong>
-                    <span className="muted">{[i.sku, i.size, i.finish].filter(Boolean).join(", ")}</span>
+                  <button className="row-btn row-photo" onClick={() => setItem({ id: i.netsuite_id, name: i.name })}>
+                    <Photo url={i.image_url} size={48} />
+                    <span className="row-photo-text">
+                      <strong>{i.name}</strong>
+                      <span className="muted">{[i.sku, i.unit, i.size, i.finish].filter(Boolean).join(", ")}</span>
+                    </span>
                   </button>
                 </li>
               ))}
@@ -314,6 +324,7 @@ function TagSheet({ job, tag, cand, onClose, onDone }: { job: Job; tag: Tag; can
 
   return (
     <Sheet title={cand.display_name} onClose={onClose}>
+      {cand.item?.image_url && <div className="sheet-photo"><Photo url={cand.item.image_url} size={480} alt={cand.display_name} /></div>}
       <p className="muted">
         {isReal ? `In ${area?.name}` : "Not tagged to an area yet"}
         {cand.supplier ? ` — ${cand.supplier}` : ""}

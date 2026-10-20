@@ -601,3 +601,19 @@ body:has(.login) { background: radial-gradient(120% 90% at 20% 0%, #24486a 0%, v
 
 .sheet-foot { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--grout); }
 .btn-danger-text { color: var(--oxide); padding-left: 0; }
+
+/* ---- product photos */
+.photo { display: block; flex-shrink: 0; border-radius: 6px; object-fit: cover; background: var(--sand-soft); border: 1px solid var(--grout); }
+.photo-none {
+  /* no photo: four small tiles with grout between, in the brand's sand */
+  background:
+    linear-gradient(var(--surface), var(--surface)) center / 2px 100% no-repeat,
+    linear-gradient(var(--surface), var(--surface)) center / 100% 2px no-repeat,
+    linear-gradient(135deg, #efe7da, var(--sand-soft));
+}
+.tile-line-photo { display: flex !important; flex-direction: row !important; align-items: center; gap: 12px; }
+.tile-text { display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.row-photo { flex-direction: row !important; align-items: center; gap: 12px; }
+.row-photo-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sheet-photo { margin: -4px 0 14px; }
+.sheet-photo .photo { width: 100% !important; height: auto !important; max-height: 280px; aspect-ratio: 4 / 3; }
