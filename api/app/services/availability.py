@@ -91,9 +91,6 @@ def check_stock(db: Session, tag: CandidateTag, by: User, fetch_stock: Callable[
         raise HTTPException(409, "This tile was declined for the area.")
     if cand.source != "stock" or cand.netsuite_item_id is None:
         raise HTTPException(422, "Only our own stock can be checked here — confirm local or overseas tiles instead.")
-    need = need_for(tag, area)
-    if not need:
-        raise HTTPException(422, f"{tile} for {area.name} has no footage yet. Enter it on the tile first.")
     item = db.get(Item, cand.netsuite_item_id)
     if item is not None and item.unit and not SQFT.match(item.unit.strip()):
         raise HTTPException(
@@ -101,6 +98,9 @@ def check_stock(db: Session, tag: CandidateTag, by: User, fetch_stock: Callable[
             f"NetSuite counts this item in {item.unit}, not square feet, so it can't be compared with the footage. "
             "Check it by hand on the stock box.",
         )
+    need = need_for(tag, area)
+    if not need:
+        raise HTTPException(422, f"{tile} for {area.name} has no footage yet. Enter it on the tile first.")
     stock = fetch_stock(cand.netsuite_item_id)
     rows = stock.get("rows", [])
     total = Decimal(str(stock.get("totals", {}).get("available", 0)))
