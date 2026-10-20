@@ -112,7 +112,7 @@ export function NewJob() {
           });
         }}
       >
-        <Field label="Job name" hint="Whatever you heard — “Kisch – Mountain” is fine. Rename it when the address is confirmed.">
+        <Field label="Job name" hint="Whatever you heard is fine. Rename it when the address is confirmed.">
           <input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
 
