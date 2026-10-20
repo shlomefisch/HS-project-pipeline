@@ -76,7 +76,9 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
         if changed("name"):
             old, new = changes["name"]
             lines.append(f"Renamed from “{old}” to “{new}”")
-        if changed("rep_id"):
+        if changed("covering_for_id"):
+            lines.append("Covering while the rep is away" if g("covering_for_id") else "The rep is back")
+        elif changed("rep_id"):
             lines.append("Rep changed")
         if changed("status"):
             old, new = changes["status"]
@@ -197,6 +199,8 @@ def _story(table: str, action: str, obj: Base, changes: dict) -> str | None:
             }.get(status, status)
             return f"{label}: {g('title')}" + (f" — {note}" if note and status != "open" else "")
         if changed("assignee_id"):
+            if changed("covering_for_id"):
+                return f"{'Covering' if g('covering_for_id') else 'Back with its owner'}: {g('title')}"
             return f"Reassigned: {g('title')}"
         return None
 

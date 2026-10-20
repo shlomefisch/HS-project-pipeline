@@ -103,6 +103,9 @@ def schedule_visit(job_id: int, body: VisitCreate, db: Session = Depends(get_db)
         status="scheduled",
         created_by=user.id,
     )
+    from ..services.absences import route
+
+    v.rep_id, v.covering_for_id = route(db, rep.id)
     db.add(v)
     db.commit()
     return row(v)
@@ -145,6 +148,7 @@ def reschedule_visit(visit_id: int, body: VisitReschedule, db: Session = Depends
     new = ScheduledVisit(
         job_id=v.job_id,
         rep_id=v.rep_id,
+        covering_for_id=v.covering_for_id,
         showroom=v.showroom,
         kind=v.kind,
         starts_at=body.starts_at,

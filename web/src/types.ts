@@ -144,6 +144,7 @@ export interface Task {
   outcome_note: string | null;
   needs_rep_attention: boolean;
   kind?: "takeoff" | null;
+  covering_for_id?: number | null;
   job_name?: string;
   job_rep_id?: number;
   overdue?: boolean;
@@ -296,4 +297,33 @@ export interface Estimate {
   lines: EstimateLine[];
   total: number;
   warnings: string[];
+}
+
+export interface Absence {
+  id: number;
+  user_id: number;
+  cover_id: number;
+  starts_on: string;
+  ends_on: string;
+  note: string | null;
+  status: "planned" | "active" | "ended" | "cancelled";
+  took_takeoff: boolean;
+}
+
+export interface HeldItem {
+  id: number;
+  label: string;
+  job_id?: number;
+  job_name?: string | null;
+  due_date?: string;
+  starts_at?: string;
+}
+
+export interface AwayOrGone {
+  user: User;
+  holds: { jobs: HeldItem[]; tasks: HeldItem[]; visits: HeldItem[]; takeoff: boolean };
+  counts: { jobs: number; tasks: number; visits: number; takeoff: number };
+  current: Absence | null;
+  history: Absence[];
+  covering_for: number[];
 }

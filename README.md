@@ -18,7 +18,9 @@ stalls because nobody knew it was their turn.
 
 **Order assembly (first part):** plans and photos on the job (upload, phone camera, Dropbox / Google Drive links pulled in), footage per area with its source and confidence, and the takeoff task (default person on the Team screen; it can't close until every area has footage). Availability per chosen tile: our stock is available only if one lot covers the need; two lots is short until the rep goes ahead with a reason; local and overseas are confirmed by hand; anything short puts a task on the rep. Estimates: pick the areas (each needs footage and a chosen tile), lines are priced from NetSuite Base Price (live), any price can be changed and is marked, with warnings for approximate footage, unchecked or short availability, missing quantities and missing prices. Not yet sent to NetSuite. Files are kept in the database.
 
-**Not yet:** the NetSuite push and read-back,  push notifications, templates, footage and availability, away/gone, offline queue.
+**Away or gone** (Team → person → Away or gone…): away = dates and a cover; everything they hold (jobs, open tasks, upcoming visits, the takeoff slot) and anything new goes to the cover, marked "covering for"; on return open work goes back by itself, finished work stays credited to the cover. Gone = hand over in bulk or one by one; deactivate is locked until every count is zero.
+
+**Not yet:** the NetSuite push and read-back,  push notifications, templates, footage and availability, offline queue.
 The item list is a stand-in table until the sync exists.
 
 ## Layout

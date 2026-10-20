@@ -12,6 +12,7 @@ import { JobPage } from "./pages/Job";
 import { Scan } from "./pages/Scan";
 import { People, PersonPage } from "./pages/People";
 import { Admin } from "./pages/Admin";
+import { AwayOrGone } from "./pages/AwayOrGone";
 
 function Root() {
   const [me, setMe] = useState<User | null | undefined>(undefined);
@@ -71,6 +72,7 @@ function Shell({ onSignOut, onMe }: { onSignOut: () => void; onMe: (u: User) => 
   else if (section === "scan") page = <Scan jobId={a ? Number(a) : null} key={a ?? "scan"} />;
   else if (section === "people" && a) page = <PersonPage id={Number(a)} key={a} />;
   else if (section === "people") page = <People />;
+  else if (section === "team" && me.is_admin && a) page = <AwayOrGone id={Number(a)} key={a} />;
   else if (section === "team" && me.is_admin) page = <Admin />;
   else page = <Today onSignOut={onSignOut} onMe={onMe} />;
   void b;

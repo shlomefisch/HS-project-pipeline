@@ -25,11 +25,42 @@ def _loop() -> None:
         wait = settings.ns_sync_minutes * 60
 
 
+ABSENCE_EVERY = 600  # seconds: aways start and end within ten minutes of midnight
+ABSENCE_LOCK = 815_002
+
+
+def _absence_loop() -> None:
+    from sqlalchemy import text
+
+    from .db import SessionLocal
+    from .services import absences
+
+    wait = 30
+    while not _stop.wait(wait):
+        wait = ABSENCE_EVERY
+        db = SessionLocal()
+        try:
+            if db.scalar(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": ABSENCE_LOCK}):
+                if absences.apply_due(db):
+                    log.info("aways started/ended")
+                db.commit()
+        except Exception:
+            log.exception("away check failed")
+            db.rollback()
+        finally:
+            db.close()
+
+
 def start() -> None:
+    import os
+
+    if os.environ.get("DISABLE_TIMERS") == "1":  # tests drive these by hand
+        return
+    _stop.clear()
+    threading.Thread(target=_absence_loop, name="aways", daemon=True).start()
     if not settings.netsuite_configured or settings.ns_sync_minutes <= 0:
         log.info("item sync timer off (keys missing or NS_SYNC_MINUTES=0)")
         return
-    _stop.clear()
     threading.Thread(target=_loop, name="item-sync", daemon=True).start()
 
 

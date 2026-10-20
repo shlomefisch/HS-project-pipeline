@@ -16,7 +16,7 @@ from . import audit  # noqa: F401  — registers the audit hook on every session
 from . import scheduler
 from .config import settings
 from .db import engine
-from .routers import auth, dashboard, entities, estimates, jobs, meta, plans, selection, sync, tasks, timeline, users
+from .routers import auth, dashboard, entities, estimates, jobs, meta, plans, selection, sync, tasks, team, timeline, users
 
 
 
@@ -29,7 +29,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Project Pipeline", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=lifespan)
 
-for r in (meta, auth, users, entities, jobs, selection, plans, estimates, timeline, tasks, dashboard, sync):
+for r in (meta, auth, users, entities, jobs, selection, plans, estimates, timeline, tasks, dashboard, sync, team):
     app.include_router(r.router, prefix="/api")
 
 

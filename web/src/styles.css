@@ -337,3 +337,13 @@ legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
 .est-amount { grid-area: amount; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .est-total { text-align: right; font-size: 1.1rem; margin: 12px 0; }
 .est-total strong { font-size: 1.3rem; }
+
+/* Away or gone */
+.hold-counts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hold-counts span { padding: 10px; border: 1px solid var(--grout); border-radius: var(--radius); background: var(--surface); }
+.hold-counts strong { display: block; font-size: 1.3rem; }
+.hold-group h3 { font-size: 1rem; margin: 16px 0 4px; }
+.hold-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; }
+.link-btn { background: none; border: 0; padding: 0; text-align: left; color: var(--slate); font: inherit; cursor: pointer; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.covering { font-size: 0.8rem; color: var(--ochre); font-weight: 600; }

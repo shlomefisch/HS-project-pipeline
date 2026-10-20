@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { niceDate, niceTime, useApp, useLoad } from "../state";
+import { go, niceDate, niceTime, useApp, useLoad } from "../state";
 import { ErrorLine, Field, Loading, Sheet, useAction } from "../ui";
 import type { AppSettings, ItemSyncStatus, SyncRun, User } from "../types";
 
@@ -85,6 +85,9 @@ function EditUser({ user, onClose, onDone }: { user: User; onClose: () => void; 
       <label className="check"><input type="checkbox" checked={form.is_admin} onChange={(e) => setForm({ ...form, is_admin: e.target.checked })} /> Admin</label>
       <label className="check"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Can sign in</label>
       {user.id !== me.id && <ResetPassword user={user} onDone={onDone} />}
+      {user.id !== me.id && (
+        <button type="button" className="btn btn-quiet btn-small" onClick={() => go(`/team/${user.id}`)}>Away or gone…</button>
+      )}
       <ErrorLine error={error} />
       <div className="actions">
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>

@@ -33,6 +33,9 @@ def create_task(
     source_event_id: int | None = None,
 ) -> Task:
     active_user(db, step.assignee_id)
+    from .absences import route
+
+    assignee_id, covering_for = route(db, step.assignee_id)
     if step.area_id is not None:
         area = db.get(Area, step.area_id)
         if area is None or area.job_id != job.id:
@@ -42,7 +45,8 @@ def create_task(
         area_id=step.area_id,
         title=step.title.strip(),
         notes=step.notes,
-        assignee_id=step.assignee_id,
+        assignee_id=assignee_id,
+        covering_for_id=covering_for,
         due_date=step.due_date,
         severity=step.severity,
         status="open",

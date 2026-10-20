@@ -83,6 +83,7 @@ class Job(Base):
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    covering_for_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class JobRole(Base):
@@ -215,6 +216,7 @@ class ScheduledVisit(Base):
     rescheduled_to_id: Mapped[int | None] = mapped_column(ForeignKey("scheduled_visits.id"))
     created_at: Mapped[datetime] = _now()
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    covering_for_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class Event(Base):
@@ -259,6 +261,23 @@ class Task(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     kind: Mapped[str | None] = mapped_column(Text)  # "takeoff", or None for an ordinary step
+    covering_for_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+
+class Absence(Base):
+    __tablename__ = "absences"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    cover_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    starts_on: Mapped[date] = mapped_column(Date)
+    ends_on: Mapped[date] = mapped_column(Date)
+    note: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, default="planned")
+    took_takeoff: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = _now()
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AppSetting(Base):

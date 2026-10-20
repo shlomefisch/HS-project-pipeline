@@ -76,6 +76,7 @@ function jump(id: string) {
 }
 
 function RepDashboard() {
+  const { userName } = useApp();
   const { data, error, reload } = useLoad(() => api.get<RepView>("/dashboard/rep"), []);
   const [open, setOpen] = useState<Task | null>(null);
   if (!data) return <Loading error={error} />;
@@ -98,7 +99,7 @@ function RepDashboard() {
             {data.went_wrong.map((t) => (
               <li key={t.id} className="task-row task-alert">
                 <a href={`#/jobs/${t.job_id}`} className="row-link">
-                  <strong>{t.title}</strong>
+                  <strong>{t.title}</strong>{t.covering_for_id ? <span className="covering"> covering for {userName(t.covering_for_id)}</span> : null}
                   <span className="muted">
                     {t.job_name} — {t.status === "blocked" ? "Blocked" : "Bad answer"}: {t.outcome_note}
                   </span>
@@ -152,7 +153,7 @@ function RepDashboard() {
             {data.due.map((t) => (
               <li key={t.id} className={`task-row ${t.overdue ? "task-overdue" : ""}`}>
                 <button className="row-btn" onClick={() => setOpen(t)}>
-                  <strong>{t.title}</strong>
+                  <strong>{t.title}</strong>{t.covering_for_id ? <span className="covering"> covering for {userName(t.covering_for_id)}</span> : null}
                   <span className="muted">
                     {t.job_name} — {t.overdue ? `overdue since ${niceDate(t.due_date)}` : "due today"}
                   </span>
@@ -204,6 +205,7 @@ function RepDashboard() {
 }
 
 function OfficeDashboard() {
+  const { userName } = useApp();
   const { data, error, reload } = useLoad(() => api.get<OfficeView>("/dashboard/office"), []);
   const [open, setOpen] = useState<Task | null>(null);
   if (!data) return <Loading error={error} />;
@@ -219,7 +221,7 @@ function OfficeDashboard() {
           {data.tasks.map((t) => (
             <li key={t.id} className={`task-row ${t.overdue ? "task-overdue" : ""} ${t.status === "blocked" ? "task-alert" : ""}`}>
               <button className="row-btn" onClick={() => setOpen(t)}>
-                <strong>{t.title}</strong>
+                <strong>{t.title}</strong>{t.covering_for_id ? <span className="covering"> covering for {userName(t.covering_for_id)}</span> : null}
                 <span className="muted">
                   {t.job_name} — {t.status === "blocked" ? `blocked: ${t.outcome_note}` : niceDate(t.due_date)}
                 </span>

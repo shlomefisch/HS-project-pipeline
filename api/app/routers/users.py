@@ -102,18 +102,17 @@ def update_user(user_id: int, body: UserUpdate, db: Session = Depends(get_db), m
         raise HTTPException(422, "Unknown class.")
     if target.id == me.id and data.get("is_admin") is False:
         raise HTTPException(422, "You can't remove your own admin rights.")
-    if data.get("active") is False:
-        # Away/gone screen comes later; until then, refuse to orphan live work.
-        open_tasks = db.scalar(
-            select(func.count()).select_from(Task).where(Task.assignee_id == target.id, Task.status.in_(("open", "blocked")))
-        )
-        if open_tasks:
-            raise HTTPException(409, f"{target.name} still has {open_tasks} open task(s). Reassign them first.")
-        owned = db.scalar(
-            select(func.count()).select_from(Job).where(Job.rep_id == target.id, Job.status.in_(("active", "on_hold")))
-        )
-        if owned:
-            raise HTTPException(409, f"{target.name} is still the rep on {owned} open job(s). Reassign them first.")
+    if data.get("active") is False and target.active:
+        # Nothing may be orphaned: every count on the Away or gone screen must be zero.
+        from ..services import absences
+
+        h = absences.holdings(db, target.id)
+        left = [f"{len(h[k])} {label}" for k, label in (("jobs", "open job(s)"), ("tasks", "open task(s)"), ("visits", "upcoming visit(s)")) if h[k]]
+        if h["takeoff"]:
+            left.append("the takeoff slot")
+        if left:
+            raise HTTPException(409, f"{target.name} still holds {', '.join(left)}. Hand them over on the Away or gone screen first.")
+        absences.release_on_deactivate(db, target.id)
     for k, v in data.items():
         setattr(target, k, v)
     db.commit()

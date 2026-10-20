@@ -126,6 +126,9 @@ def create_job(body: JobCreate, db: Session = Depends(get_db), user: User = Depe
         status="active",
         created_by=user.id,
     )
+    from ..services.absences import route
+
+    job.rep_id, job.covering_for_id = route(db, rep.id)
     db.add(job)
     db.flush()
     for p in body.people:
@@ -254,7 +257,9 @@ def change_rep(job_id: int, body: RepChange, db: Session = Depends(get_db), _: U
     """One rep per job. The new rep owns every open task from this moment."""
     job = get_job(db, job_id)
     check_rep(db, body.rep_id)
-    job.rep_id = body.rep_id
+    from ..services.absences import route
+
+    job.rep_id, job.covering_for_id = route(db, body.rep_id)
     db.commit()
     return job_detail(db, job)
 

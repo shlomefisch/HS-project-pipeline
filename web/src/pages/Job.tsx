@@ -173,7 +173,7 @@ function Steps({ job, reload, onLogVisit }: { job: Job; reload: () => void; onLo
           {openTasks.map((t) => (
             <li key={t.id} className={`task-row ${t.status === "blocked" ? "task-alert" : ""} ${t.due_date < new Date().toISOString().slice(0, 10) ? "task-overdue" : ""}`}>
               <button className="row-btn" onClick={() => setOpen({ ...t, job_name: job.name, job_rep_id: job.rep_id })}>
-                <strong>{t.title}</strong>
+                <strong>{t.title}</strong>{t.covering_for_id ? <span className="covering"> covering for {userName(t.covering_for_id)}</span> : null}
                 <span className="muted">
                   {userName(t.assignee_id)} — {t.status === "blocked" ? `blocked: ${t.outcome_note}` : `due ${niceDate(t.due_date).toLowerCase()}`}
                 </span>
