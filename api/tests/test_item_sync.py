@@ -102,7 +102,7 @@ def test_only_stocking_items_show_in_search_and_units_come_along(client, jay):
 def test_row_mapping():
     assert item_sync.to_item(ns(5, "SKU-5", "Nice Tile"), {1: "SF"}) == {
         "netsuite_id": 5, "name": "Nice Tile", "sku": "SKU-5", "active": True, "is_lot": False,
-        "is_stock": True, "unit_id": 1, "unit": "SF",
+        "is_stock": True, "unit_id": 1, "unit": "SF", "image_file_id": None,
     }
     assert item_sync.to_item({"id": "6", "itemid": None, "displayname": None})["name"] == "Item #6"
 
