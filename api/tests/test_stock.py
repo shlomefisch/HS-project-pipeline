@@ -15,20 +15,23 @@ class Fake:
             if not self.lots_ok:
                 raise NetSuiteError("not allowed")
             return [
-                {"location": "Newark", "lot": "L-204", "onhand": "200", "available": "100"},
-                {"location": "Newark", "lot": "L-204", "onhand": "100", "available": "20"},  # second bin
-                {"location": "Newark", "lot": "L-311", "onhand": 500, "available": 500},
-                {"location": "Monsey", "lot": "L-204", "onhand": 0, "available": 0},
+                {"location": "1", "lot": "L-204", "onhand": "200", "available": "100"},
+                {"location": 1, "lot": "L-204", "onhand": "100", "available": "20"},  # second bin
+                {"location": "1", "lot": "L-311", "onhand": 500, "available": 500},
+                {"location": "2", "lot": "L-204", "onhand": 0, "available": 0},
             ], False
+        if "FROM location" in sql:
+            return [{"id": "1", "name": "Newark"}, {"id": "2", "name": "Monsey"}], False
         if "aggregateitemlocation" in sql:
             raise NetSuiteError("unsupported")
         if "inventoryitemlocations" in sql:
-            return [{"location": "Newark", "onhand": 800, "available": 620}], False
+            return [{"location": "1", "onhand": 800, "available": 620}], False
         return [{"unit": "SF"}], False
 
 
 def test_by_lot_with_totals_and_empty_rows_dropped():
     stock._working = None
+    stock._locations = None
     r = stock.fetch(Fake(), 11)
     assert r["by_lot"] and r["unit"] == "SF"
     assert [x["lot"] for x in r["rows"]] == ["L-311", "L-204"]  # most free first
@@ -76,3 +79,17 @@ def test_answers_are_cached_for_a_few_minutes():
 
 def test_stock_needs_netsuite_connected(client, jay):
     assert jay.get("/api/items/11/stock").status_code == 409
+
+
+def test_numbers_still_come_when_location_names_are_off_limits():
+    class NoNames(Fake):
+        def page(self, sql, limit=1000, offset=0):
+            if "FROM location" in sql:
+                raise NetSuiteError("no permission")
+            return super().page(sql, limit, offset)
+
+    stock._working = None
+    stock._locations = None
+    r = stock.fetch(NoNames(), 11)
+    assert r["rows"][0]["location"] == "Location #1" and r["totals"]["available"] == 620.0
+    stock._locations = None

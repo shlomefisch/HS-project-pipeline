@@ -17,21 +17,27 @@ _lock = threading.Lock()
 # No GROUP BY on display values (NetSuite rejects some of those); totals are added up here.
 VARIANTS = [
     ("lots", True,
-     "SELECT BUILTIN.DISPLAY(inl.location) AS location, inv.inventorynumber AS lot, "
+     "SELECT inl.location AS location, inv.inventorynumber AS lot, "
      "inl.quantityonhand AS onhand, inl.quantityavailable AS available "
      "FROM inventorynumberlocation inl JOIN inventorynumber inv ON inv.id = inl.inventorynumber "
      "WHERE inv.item = {id}"),
     ("balance", True,
-     "SELECT BUILTIN.DISPLAY(ib.location) AS location, BUILTIN.DISPLAY(ib.inventorynumber) AS lot, "
+     "SELECT ib.location AS location, inv.inventorynumber AS lot, "
      "ib.quantityonhand AS onhand, ib.quantityavailable AS available "
-     "FROM inventorybalance ib WHERE ib.item = {id}"),
+     "FROM inventorybalance ib LEFT JOIN inventorynumber inv ON inv.id = ib.inventorynumber "
+     "WHERE ib.item = {id}"),
     ("aggregate", False,
-     "SELECT BUILTIN.DISPLAY(ail.location) AS location, ail.quantityonhand AS onhand, "
+     "SELECT ail.location AS location, ail.quantityonhand AS onhand, "
      "ail.quantityavailable AS available FROM aggregateitemlocation ail WHERE ail.item = {id}"),
     ("item_locations", False,
-     "SELECT BUILTIN.DISPLAY(iil.location) AS location, iil.quantityonhand AS onhand, "
+     "SELECT iil.location AS location, iil.quantityonhand AS onhand, "
      "iil.quantityavailable AS available FROM inventoryitemlocations iil WHERE iil.item = {id}"),
 ]
+# Names looked up on their own: reading a location's name needs its own permission,
+# and a missing one must cost only the names, not the numbers.
+LOCATION_SQL = "SELECT location.id AS id, location.name AS name FROM location"
+LOCATION_CACHE_SECONDS = 3600
+_locations: tuple[float, dict[str, str]] | None = None
 _working: str | None = None  # name of the variant that last worked
 UNIT_SQL = "SELECT BUILTIN.DISPLAY(item.stockunit) AS unit FROM item WHERE item.id = {id}"
 
@@ -64,6 +70,19 @@ def _shape(item_id: int, raw: list[dict], with_lots: bool, unit: str | None) -> 
     }
 
 
+def _location_names(client: SuiteQL) -> dict[str, str]:
+    global _locations
+    if _locations and time.monotonic() - _locations[0] < LOCATION_CACHE_SECONDS:
+        return _locations[1]
+    try:
+        rows, _ = client.page(LOCATION_SQL)
+        names = {str(r["id"]): r.get("name") or f"Location #{r['id']}" for r in rows}
+    except NetSuiteError:
+        names = {}
+    _locations = (time.monotonic(), names)
+    return names
+
+
 def fetch(client: SuiteQL, item_id: int) -> dict:
     global _working
     item_id = int(item_id)  # never anything but a number goes into the query
@@ -79,6 +98,10 @@ def fetch(client: SuiteQL, item_id: int) -> dict:
         break
     else:
         raise NetSuiteError(" | ".join(problems))
+    names = _location_names(client)
+    for r in raw:
+        loc = r.get("location")
+        r["location"] = names.get(str(loc), f"Location #{loc}") if loc not in (None, "") else None
     try:
         units, _ = client.page(UNIT_SQL.format(id=item_id), limit=1)
         unit = (units[0].get("unit") if units else None) or None
