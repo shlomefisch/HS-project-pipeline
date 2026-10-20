@@ -12,6 +12,13 @@ class FakeNetSuite:
         self.fail = fail
         self.queries = []
 
+    def page(self, sql, limit=1000, offset=0):
+        if self.fail:
+            raise NetSuiteError(self.fail)
+        if "baseunit" in sql:
+            raise NetSuiteError("Invalid search: baseunit")  # like an account that won't expose it
+        return [], False
+
     def by_id(self, sql_for_after, id_field="id"):
         after = 0
         while True:
@@ -32,7 +39,7 @@ class FakeNetSuite:
 
 def ns(i, code, display="", inactive="F", lot="F", stock="T", unit="1"):
     return {"id": str(i), "itemid": code, "displayname": display, "isinactive": inactive, "islotitem": lot,
-            "custitem4": stock, "stockunit": unit}
+            "custitem4": stock, "unitref": unit}
 
 
 def _engine():
@@ -46,6 +53,7 @@ def test_full_sync_fills_items_and_search_finds_them(client, jay):
     result = item_sync.run(_engine(), fake)
     assert result == {"status": "ok", "mode": "full", "rows": 3, "retired": 0}
     assert len(fake.queries) == 2  # paged by id, not by offset
+    assert "item.stockunit AS unitref" in fake.queries[0]  # baseunit refused, fell back
     found = jay.get("/api/items", params={"q": "calacatta"}).json()
     assert found[0]["netsuite_id"] == 11 and found[0]["sku"] == "CAL-1224" and found[0]["is_lot"] is True
     assert jay.get("/api/items", params={"q": "CAR-1224"}).json()[0]["name"] == "CAR-1224"

@@ -25,7 +25,7 @@ STALE_RUN = timedelta(hours=2)
 
 ITEM_SQL = (
     "SELECT item.id, item.itemid, item.displayname, item.isinactive, item.islotitem, "
-    "item.custitem4, item.stockunit "
+    "item.custitem4, item.{unit_field} AS unitref "
     "FROM item WHERE item.itemtype = 'InvtPart' AND item.id > {after}{since} ORDER BY item.id"
 )
 
@@ -42,18 +42,46 @@ def client_from_settings() -> SuiteQL:
 UNIT_SQL = "SELECT u.internalid AS id, u.abbreviation AS abbr, u.unitname AS name FROM unitstypeuom u"
 
 
-def unit_names(client) -> dict[int, str]:
+# The unit field: baseunit if NetSuite lets queries read it, else stockunit.
+UNIT_FIELDS = ("baseunit", "stockunit")
+
+
+def pick_unit_field(client) -> str | None:
+    for field in UNIT_FIELDS:
+        try:
+            client.page(f"SELECT item.id, item.{field} FROM item WHERE item.itemtype = 'InvtPart'", limit=1)
+            return field
+        except NetSuiteError as exc:
+            log.warning("unit field %s not readable: %s", field, exc)
+    return None
+
+
+def unit_names(client, unit_field: str | None) -> dict[int, str]:
+    """Unit id -> label. First from the units table; if that's off limits,
+    from the display value of the item's own unit field."""
+    names: dict[int, str] = {}
     try:
-        names: dict[int, str] = {}
         for page in client.by_id(lambda after: f"{UNIT_SQL} WHERE u.internalid > {after} ORDER BY u.internalid"):
             for r in page:
                 label = (r.get("abbr") or r.get("name") or "").strip()
                 if label:
                     names[int(r["id"])] = label
-        return names
     except NetSuiteError as exc:
-        log.warning("unit names unavailable: %s", exc)
-        return {}
+        log.warning("units table unavailable: %s", exc)
+    if names or not unit_field:
+        return names
+    try:
+        rows, _ = client.page(
+            f"SELECT item.{unit_field} AS id, BUILTIN.DISPLAY(item.{unit_field}) AS abbr FROM item "
+            f"WHERE item.{unit_field} IS NOT NULL GROUP BY item.{unit_field}, BUILTIN.DISPLAY(item.{unit_field})"
+        )
+        for r in rows:
+            label, uid = (r.get("abbr") or "").strip(), _int(r.get("id"))
+            if label and uid is not None:
+                names[uid] = label
+    except NetSuiteError as exc:
+        log.warning("unit labels unavailable: %s", exc)
+    return names
 
 
 def _int(v) -> int | None:
@@ -68,7 +96,7 @@ def to_item(r: dict, units: dict[int, str] | None = None) -> dict:
     code = (r.get("itemid") or "").strip()
     display = (r.get("displayname") or "").strip()
     name = display or code or f"Item #{r['id']}"
-    unit_id = _int(r.get("stockunit"))
+    unit_id = _int(r.get("unitref", r.get("stockunit")))
     return {
         "netsuite_id": int(r["id"]),
         "name": name,
@@ -124,8 +152,10 @@ def _run_locked(engine: Engine, client: SuiteQL | None, requested: str | None, u
     seen = 0
     try:
         client = client or client_from_settings()
-        units = unit_names(client)
-        for page in client.by_id(lambda after: ITEM_SQL.format(after=after, since=since)):
+        unit_field = pick_unit_field(client)
+        units = unit_names(client, unit_field)
+        item_sql = ITEM_SQL if unit_field else ITEM_SQL.replace(", item.{unit_field} AS unitref", "")
+        for page in client.by_id(lambda after: item_sql.format(after=after, since=since, unit_field=unit_field)):
             rows = [to_item(r, units) for r in page]
             stmt = pg_insert(items).values(rows)
             stmt = stmt.on_conflict_do_update(
