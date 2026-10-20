@@ -134,3 +134,32 @@ class SuiteQL:
             if not more:
                 return
             last = int(rows[-1][id_field])
+
+
+class Records:
+    """NetSuite REST records — the one place this app writes to NetSuite.
+    Only ever creates: customers (when none matches) and estimates."""
+
+    def __init__(self, keys: Keys, http=None):
+        if http is None:
+            import requests
+
+            http = requests.Session()
+        self.keys = keys
+        self.http = http
+
+    def create(self, record: str, body: dict) -> int:
+        """POSTs a new record; returns its internal id (from the Location header)."""
+        url = f"https://{self.keys.host}/services/rest/record/v1/{record}"
+        headers = {"Authorization": oauth_header("POST", url, self.keys), "Content-Type": "application/json"}
+        try:
+            resp = self.http.post(url, json=body, headers=headers, timeout=TIMEOUT)
+        except Exception as exc:
+            raise NetSuiteError(f"Couldn't reach NetSuite: {exc}") from exc
+        if resp.status_code not in (200, 201, 204):
+            raise NetSuiteError(_problem(resp))
+        location = resp.headers.get("Location", "")
+        tail = location.rstrip("/").rsplit("/", 1)[-1]
+        if not tail.isdigit():
+            raise NetSuiteError("NetSuite saved it but didn't say its number. Check NetSuite before sending again.")
+        return int(tail)

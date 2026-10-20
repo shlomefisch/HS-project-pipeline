@@ -3,6 +3,7 @@ import { api } from "../api";
 import { niceDate, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Loading, Sheet, useAction } from "../ui";
 import type { Estimate, EstimateLine, Job } from "../types";
+import { SendEstimate } from "./SendEstimate";
 
 const money = (n: number | null) => (n == null ? "—" : n.toLocaleString(undefined, { style: "currency", currency: "USD" }));
 const qtyFmt = (n: number | null) => (n == null ? "—" : n.toLocaleString(undefined, { maximumFractionDigits: 2 }));
@@ -13,6 +14,7 @@ export function EstimateTab({ job, reload }: { job: Job; reload: () => void }) {
   if (!ests.data) return <Loading error={ests.error} />;
   const draft = ests.data.find((e) => e.status === "draft");
   const pushed = ests.data.filter((e) => e.status === "pushed");
+  const account = "5032967";
   const after = () => { ests.reload(); reload(); };
   return (
     <div className="estimate">
@@ -22,7 +24,14 @@ export function EstimateTab({ job, reload }: { job: Job; reload: () => void }) {
           <h2>Sent to NetSuite</h2>
           <ul className="list">
             {pushed.map((e) => (
-              <li key={e.id}>{niceDate(e.pushed_at)} — {money(e.total)} {e.netsuite_estimate_id ? `(NetSuite #${e.netsuite_estimate_id})` : ""}</li>
+              <li key={e.id} className="sent-row">
+                <span>{niceDate(e.pushed_at)} — {money(e.total)}</span>
+                {e.netsuite_estimate_id && (
+                  <a className="btn btn-small" href={`https://${account}.app.netsuite.com/app/accounting/transactions/estimate.nl?id=${e.netsuite_estimate_id}`} target="_blank" rel="noopener">
+                    Open estimate #{e.netsuite_estimate_id} in NetSuite
+                  </a>
+                )}
+              </li>
             ))}
           </ul>
         </section>
@@ -71,6 +80,7 @@ function Draft({ job, est, onChanged }: { job: Job; est: Estimate; onChanged: ()
   const { userName } = useApp();
   const [editing, setEditing] = useState<EstimateLine | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [sending, setSending] = useState(false);
   const { busy, error, run } = useAction();
   const areaNames = est.area_ids.map((id) => job.areas.find((a) => a.id === id)?.name).filter(Boolean).join(", ");
   return (
@@ -104,8 +114,9 @@ function Draft({ job, est, onChanged }: { job: Job; est: Estimate; onChanged: ()
       <div className="actions actions-wrap">
         <button className="btn btn-quiet" disabled={busy} onClick={() => setConfirmDiscard(true)}>Discard</button>
         <button className="btn" disabled={busy} onClick={() => run(async () => { await api.post(`/estimates/${est.id}/refresh-prices`); onChanged(); })}>Re-read prices</button>
-        <button className="btn btn-primary" disabled title="Coming next: sending the estimate to NetSuite">Send to NetSuite (next)</button>
+        <button className="btn btn-primary" disabled={busy} onClick={() => setSending(true)}>Send to NetSuite</button>
       </div>
+      {sending && <SendEstimate est={est} onClose={() => setSending(false)} onDone={() => { setSending(false); onChanged(); }} />}
       {editing && <LineSheet line={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); onChanged(); }} />}
       {confirmDiscard && (
         <Sheet title="Discard this estimate?" onClose={() => setConfirmDiscard(false)}>

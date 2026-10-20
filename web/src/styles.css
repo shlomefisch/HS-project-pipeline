@@ -617,3 +617,8 @@ body:has(.login) { background: radial-gradient(120% 90% at 20% 0%, #24486a 0%, v
 .row-photo-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sheet-photo { margin: -4px 0 14px; }
 .sheet-photo .photo { width: 100% !important; height: auto !important; max-height: 280px; aspect-ratio: 4 / 3; }
+
+.send-h { margin: 18px 0 8px; font-size: 0.95rem; }
+.match-row { align-items: flex-start; padding: 8px 0; }
+.sent-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; flex-wrap: wrap; }
+.error-line ul { margin: 6px 0 0; padding-left: 18px; }

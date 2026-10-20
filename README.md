@@ -28,7 +28,9 @@ stalls because nobody knew it was their turn.
 
 **Offline:** field saves (log what happened, steps, tiles, areas, footage, samples, visits) made without signal wait on the phone and send in order when it returns; each carries a one-time Idempotency-Key so a resend is never applied twice (answers kept 14 days). Screens last opened stay readable offline. Uploads, sign-in, new jobs/people and admin stay online-only.
 
-**Not yet:** sending estimates to NetSuite and reading them back (left for last, on purpose).
+**Sending estimates to NetSuite** (Estimate tab → Send to NetSuite): bill-to from the job's people (owner first), matched to a NetSuite customer by email / phone / name (a new customer only when none matches; the match is remembered), lines with our prices (custom price level), the department as the class, and a one-time externalId so a resend never makes a second estimate. Creates only an estimate. Switched off until `NS_WRITE_TOKEN_ID` and `NS_WRITE_TOKEN_SECRET` are set — a token on a role made for this app, not the POS role. Optional: `NS_WRITE_CONSUMER_KEY/SECRET` (default: the read ones), `NS_SPECIAL_ITEM_ID` (a NetSuite item for local / overseas tiles), `NS_SUBSIDIARY_ID` (default 1).
+
+**Not yet:** reading estimates back from NetSuite (the timed check that suggests the next move).
 The item list is a stand-in table until the sync exists.
 
 ## Layout

@@ -48,6 +48,21 @@ class Settings:
     # How often the item list refreshes. 0 turns the timer off (the Sync now button still works).
     ns_sync_minutes: int = field(default_factory=lambda: int(os.environ.get("NS_SYNC_MINUTES", "60") or 0))
 
+    # Writing estimates: a separate token on a role made for this app (never the POS role).
+    # The consumer key/secret default to the read ones (same integration record).
+    ns_write_token_id: str = field(default_factory=lambda: os.environ.get("NS_WRITE_TOKEN_ID", "").strip())
+    ns_write_token_secret: str = field(default_factory=lambda: os.environ.get("NS_WRITE_TOKEN_SECRET", "").strip())
+    ns_write_consumer_key: str = field(default_factory=lambda: os.environ.get("NS_WRITE_CONSUMER_KEY", "").strip())
+    ns_write_consumer_secret: str = field(default_factory=lambda: os.environ.get("NS_WRITE_CONSUMER_SECRET", "").strip())
+    # NetSuite item used for local / overseas tiles that have no item of their own (optional).
+    ns_special_item_id: str = field(default_factory=lambda: os.environ.get("NS_SPECIAL_ITEM_ID", "").strip())
+    ns_subsidiary_id: str = field(default_factory=lambda: os.environ.get("NS_SUBSIDIARY_ID", "1").strip())
+
+    @property
+    def netsuite_write_configured(self) -> bool:
+        return bool(self.ns_account and self.ns_write_token_id and self.ns_write_token_secret
+                    and (self.ns_write_consumer_key or self.ns_consumer_key))
+
     @property
     def netsuite_configured(self) -> bool:
         return all((self.ns_account, self.ns_consumer_key, self.ns_consumer_secret, self.ns_token_id, self.ns_token_secret))

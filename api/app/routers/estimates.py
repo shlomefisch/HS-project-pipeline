@@ -119,3 +119,61 @@ def discard_estimate(estimate_id: int, db: Session = Depends(get_db), _: User = 
     est.status = "discarded"
     db.commit()
     return {"ok": True}
+
+
+# ------------------------------------------------------ sending to NetSuite
+from pydantic import BaseModel  # noqa: E402
+
+from ..models import Entity, Job  # noqa: E402
+from ..netsuite import NetSuiteError  # noqa: E402
+from ..services import estimate_push as P  # noqa: E402
+
+
+class PushBody(BaseModel):
+    model_config = {"extra": "forbid"}
+    entity_id: int
+    netsuite_customer_id: int | None = None
+    create_customer: bool = False
+    acknowledge_warnings: bool = False
+
+
+@router.get("/estimates/{estimate_id}/push")
+def push_check(estimate_id: int, db: Session = Depends(get_db), _: User = Depends(member)):
+    """Everything the Send panel needs: is it switched on, who can be billed, what blocks it, what to know."""
+    est = _est(db, estimate_id)
+    job = db.get(Job, est.job_id)
+    return {
+        "configured": settings.netsuite_write_configured,
+        "bill_to": P.bill_to_options(db, job),
+        **P.check(db, est),
+        "netsuite_estimate_id": est.netsuite_estimate_id,
+        "account": settings.ns_account,
+    }
+
+
+@router.get("/entities/{entity_id}/netsuite-customers")
+def netsuite_customers(entity_id: int, db: Session = Depends(get_db), _: User = Depends(writer)):
+    if not settings.netsuite_write_configured:
+        raise HTTPException(409, "Sending to NetSuite isn't switched on yet.")
+    ent = db.get(Entity, entity_id)
+    if ent is None:
+        raise HTTPException(404, "Not found.")
+    try:
+        _, ql = P.write_client()
+        return P.find_customers(ql, ent)
+    except NetSuiteError as exc:
+        raise HTTPException(502, f"Couldn't search NetSuite customers. {exc}") from exc
+
+
+@router.post("/estimates/{estimate_id}/push")
+def push_estimate(estimate_id: int, body: PushBody, db: Session = Depends(get_db), user: User = Depends(writer)):
+    if not settings.netsuite_write_configured:
+        raise HTTPException(409, "Sending to NetSuite isn't switched on yet. Add the NetSuite write keys on Railway.")
+    est = _draft(db, estimate_id)
+    try:
+        P.push(db, est, body.entity_id, body.netsuite_customer_id, body.create_customer, body.acknowledge_warnings, user)
+    except NetSuiteError as exc:
+        db.rollback()
+        raise HTTPException(502, f"NetSuite said no. {exc}") from exc
+    db.commit()
+    return estimate_out(db, est)
