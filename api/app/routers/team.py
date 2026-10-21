@@ -28,7 +28,7 @@ class AwayCreate(_In):
 
 class HandOver(_In):
     to_user_id: int
-    what: str = Field(pattern="^(jobs|tasks|visits|takeoff)$")
+    what: str = Field(pattern="^(jobs|tasks|visits|orders|takeoff)$")
     ids: list[int] | None = None  # None = all of that kind
 
 
@@ -43,7 +43,8 @@ def _screen(db: Session, u: User) -> dict:
     A.apply_due(db)
     db.commit()
     h = A.holdings(db, u.id)
-    job_names = {j.id: j.name for j in db.scalars(select(Job).where(Job.id.in_([t.job_id for t in h["tasks"]] + [v.job_id for v in h["visits"]])))} if (h["tasks"] or h["visits"]) else {}
+    ids = [t.job_id for t in h["tasks"]] + [v.job_id for v in h["visits"]] + [o.job_id for o in h["orders"]]
+    job_names = {j.id: j.name for j in db.scalars(select(Job).where(Job.id.in_(ids)))} if ids else {}
     absences = list(db.scalars(select(Absence).where(Absence.user_id == u.id).order_by(Absence.starts_on.desc()).limit(10)))
     covering = list(db.scalars(select(Absence).where(Absence.cover_id == u.id, Absence.status == "active")))
     return {
@@ -52,9 +53,10 @@ def _screen(db: Session, u: User) -> dict:
             "jobs": [{**row(j), "label": j.name} for j in h["jobs"]],
             "tasks": [{**row(t), "label": t.title, "job_name": job_names.get(t.job_id)} for t in h["tasks"]],
             "visits": [{**row(v), "label": f"{v.kind} visit", "job_name": job_names.get(v.job_id)} for v in h["visits"]],
+            "orders": [{**row(o), "label": f"Order — {o.stage}", "job_name": job_names.get(o.job_id)} for o in h["orders"]],
             "takeoff": h["takeoff"],
         },
-        "counts": {"jobs": len(h["jobs"]), "tasks": len(h["tasks"]), "visits": len(h["visits"]), "takeoff": int(h["takeoff"])},
+        "counts": {"jobs": len(h["jobs"]), "tasks": len(h["tasks"]), "visits": len(h["visits"]), "orders": len(h["orders"]), "takeoff": int(h["takeoff"])},
         "current": next((row(a) for a in absences if a.status in ("planned", "active")), None),
         "history": [row(a) for a in absences if a.status not in ("planned", "active")],
         "covering_for": [a.user_id for a in covering],

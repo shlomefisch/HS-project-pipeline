@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import member, writer
 from ..db import get_db
-from ..models import Area, Candidate, CandidateTag, Item, Sample, User
+from ..models import Area, Candidate, CandidateTag, Estimate, EstimateArea, EstimateLine, Item, Sample, User
 from ..rules.qr import parse_item_code
 from ..schemas import (
     AreaCreate,
@@ -45,7 +45,15 @@ def create_area(job_id: int, body: AreaCreate, db: Session = Depends(get_db), us
     order = (db.scalar(select(func.max(Area.sort_order)).where(Area.job_id == job.id)) or 0) + 1
     area = Area(job_id=job.id, name=body.name, status="open", sort_order=order, created_by=user.id)
     db.add(area)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Two phones adding the same room at once: both get the one room.
+        db.rollback()
+        exists = db.scalar(select(Area).where(Area.job_id == job.id, func.lower(Area.name) == body.name.lower()))
+        if exists is None:
+            raise
+        return row(exists)
     return row(area)
 
 
@@ -58,6 +66,13 @@ def update_area(area_id: int, body: AreaUpdate, db: Session = Depends(get_db), u
     refuse_nulls(data, "name", "status", "sort_order")
     if "status" in data and area.status in ("ordered", "delivered"):
         raise HTTPException(409, f"{area.name} is on an order — it moves with the order now.")
+    if data.get("status") in ("on_hold", "dropped"):
+        on_draft = db.scalar(
+            select(Estimate.id).join(EstimateArea, EstimateArea.estimate_id == Estimate.id)
+            .where(EstimateArea.area_id == area.id, Estimate.status == "draft")
+        )
+        if on_draft:
+            raise HTTPException(409, f"{area.name} is on the estimate being put together. Take it off (discard and rebuild) first.")
     if "name" in data and not data["name"].strip():
         raise HTTPException(422, "An area needs a name.")
     status = data.get("status")
@@ -157,20 +172,39 @@ def remove_candidate(candidate_id: int, db: Session = Depends(get_db), user: Use
     return {"ok": True}
 
 
+def _tag_editable(db: Session, tag: CandidateTag) -> tuple[Area, Candidate]:
+    """Tiles in an area that's on an order change through the order; a removed tile doesn't change at all."""
+    area, cand = db.get(Area, tag.area_id), db.get(Candidate, tag.candidate_id)
+    if cand is None or cand.removed_at is not None:
+        raise HTTPException(409, "That tile was removed from the job.")
+    if area is not None and area.status in ("ordered", "delivered"):
+        raise HTTPException(409, f"{area.name} is on an order — change it on the order instead.")
+    return area, cand
+
+
 # ---------------------------------------------------------------- tags
 @router.post("/candidates/{candidate_id}/tags", status_code=201)
 def add_tag(candidate_id: int, body: TagCreate, db: Session = Depends(get_db), _: User = Depends(writer)):
     """Consider the same tile for another area. One tile, one more line."""
     cand = db.get(Candidate, candidate_id)
-    if cand is None:
+    if cand is None or cand.removed_at is not None:
         raise HTTPException(404, "Tile not found.")
-    _area_on_job(db, body.area_id, cand.job_id)
+    area = _area_on_job(db, body.area_id, cand.job_id)
+    if area.status in ("ordered", "delivered"):
+        raise HTTPException(409, f"{area.name} is on an order — new work there is a new area.")
     existing = db.scalar(select(CandidateTag).where(CandidateTag.candidate_id == cand.id, CandidateTag.area_id == body.area_id))
     if existing:
         return row(existing)
     tag = CandidateTag(job_id=cand.job_id, candidate_id=cand.id, area_id=body.area_id, quantity=body.quantity)
     db.add(tag)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalar(select(CandidateTag).where(CandidateTag.candidate_id == cand.id, CandidateTag.area_id == body.area_id))
+        if existing is None:
+            raise
+        return row(existing)
     return row(tag)
 
 
@@ -180,10 +214,15 @@ def update_tag(tag_id: int, body: TagUpdate, db: Session = Depends(get_db), user
     tag = db.get(CandidateTag, tag_id)
     if tag is None:
         raise HTTPException(404, "Not found.")
+    area, _ = _tag_editable(db, tag)
     data = body.model_dump(exclude_unset=True)
-    if "quantity" in data:
+    if "quantity" in data and data["quantity"] != tag.quantity:
         tag.quantity = data["quantity"]
+        # A new number means the old stock answer is about a different amount: check again.
+        tag.avail_status = tag.avail_summary = tag.avail_lot = tag.avail_note = None
+        tag.avail_free = tag.avail_need = tag.avail_checked_at = tag.avail_checked_by = None
     status = data.get("status")
+    was_chosen = tag.status == "chosen"
     if status == "declined":
         reason = data.get("reason")
         if not reason:
@@ -198,6 +237,12 @@ def update_tag(tag_id: int, body: TagUpdate, db: Session = Depends(get_db), user
         from ..services.availability import fill_from_area
 
         fill_from_area(db, tag)
+    # Un-choosing the last chosen tile of a decided area: it's back to choosing.
+    if was_chosen and tag.status != "chosen" and area is not None and area.status == "decided":
+        db.flush()
+        left = db.scalar(select(func.count()).select_from(CandidateTag).where(CandidateTag.area_id == area.id, CandidateTag.status == "chosen"))
+        if not left:
+            area.status = "open"
     db.commit()
     return row(tag)
 
@@ -210,6 +255,8 @@ def remove_tag(tag_id: int, db: Session = Depends(get_db), _: User = Depends(wri
         raise HTTPException(404, "Not found.")
     if tag.status != "considering":
         raise HTTPException(409, "A decided tile can't be removed — decline it instead, so the history stays.")
+    if db.scalar(select(EstimateLine.id).where(EstimateLine.tag_id == tag.id).limit(1)):
+        raise HTTPException(409, "This tile was on an estimate, so it stays in the history — decline it instead.")
     db.delete(tag)
     db.commit()
     return {"ok": True}
@@ -292,6 +339,7 @@ def update_sample(sample_id: int, body: SampleUpdate, db: Session = Depends(get_
     if s is None:
         raise HTTPException(404, "Sample not found.")
     data = body.model_dump(exclude_unset=True)
+    refuse_nulls(data, "status")
     if data.get("status") == "sent" and not data.get("sent_on") and not s.sent_on:
         data["sent_on"] = today()
     for k, v in data.items():

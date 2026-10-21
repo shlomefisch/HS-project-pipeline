@@ -107,7 +107,7 @@ def update_user(user_id: int, body: UserUpdate, db: Session = Depends(get_db), m
         from ..services import absences
 
         h = absences.holdings(db, target.id)
-        left = [f"{len(h[k])} {label}" for k, label in (("jobs", "open job(s)"), ("tasks", "open task(s)"), ("visits", "upcoming visit(s)")) if h[k]]
+        left = [f"{len(h[k])} {label}" for k, label in (("jobs", "open job(s)"), ("tasks", "open task(s)"), ("visits", "upcoming visit(s)"), ("orders", "order(s) they handle")) if h[k]]
         if h["takeoff"]:
             left.append("the takeoff slot")
         if left:

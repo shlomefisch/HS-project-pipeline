@@ -39,6 +39,10 @@ def place(db: Session, est: Estimate, by: User, netsuite_ref: str | None, by_han
         raise HTTPException(409, "This estimate was discarded.")
     if db.scalar(select(Order.id).where(Order.estimate_id == est.id)):
         raise HTTPException(409, "This estimate is already an order.")
+    areas = [db.get(Area, ea.area_id) for ea in db.scalars(select(EstimateArea).where(EstimateArea.estimate_id == est.id))]
+    off = [a.name for a in areas if a is not None and a.status not in ("open", "decided")]
+    if off:
+        raise HTTPException(409, f"{', '.join(off)} was put on hold, dropped or ordered since this estimate was made. Discard it and build a new one.")
     if est.status == "draft":
         est.status, est.pushed_at = "pushed", now()
     order = Order(job_id=job.id, estimate_id=est.id, stage="negotiating", sent_by_hand=by_hand,
@@ -117,6 +121,11 @@ def lose(db: Session, o: Order, reason: str, by: User) -> Order:
     o.stage, o.lost_reason, o.closed_at = "lost", reason, now()
     for t in db.scalars(select(Task).where(Task.order_id == o.id, Task.status.in_(TASK_OPEN))):
         t.status, t.outcome_note, t.completed_at, t.completed_by = "skipped", f"Order lost: {reason}", now(), by.id
+    # Its areas are free again: they can be quoted anew, held, dropped, and the job can close.
+    for ea in db.scalars(select(EstimateArea).where(EstimateArea.estimate_id == o.estimate_id)):
+        area = db.get(Area, ea.area_id)
+        if area is not None and area.status in ("ordered", "delivered"):
+            area.status = "decided"
     return o
 
 

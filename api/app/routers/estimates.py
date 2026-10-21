@@ -104,10 +104,12 @@ def refresh_prices(estimate_id: int, db: Session = Depends(get_db), _: User = De
     for ln in db.scalars(select(EstimateLine).where(EstimateLine.estimate_id == est.id)):
         if ln.netsuite_item_id is None:
             continue
-        changed = ln.price is not None and ln.base_price is not None and ln.price != ln.base_price
+        changed = ln.price is not None and ln.price != ln.base_price  # typed by the rep, Base Price or not
         new = E._price_or_none(_base_price, ln.netsuite_item_id)
+        if new is None:
+            continue  # NetSuite didn't answer for it: keep what's there
         ln.base_price = new
-        if not changed or ln.price is None:
+        if not changed:
             ln.price = new
     db.commit()
     return estimate_out(db, est)

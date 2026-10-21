@@ -41,7 +41,8 @@ def create(db: Session, job: Job, area_ids: list[int], note: str | None, by: Use
     if held:
         raise HTTPException(422, f"{', '.join(held)} is on hold or dropped — it becomes its own order later.")
     tags = list(db.scalars(
-        select(CandidateTag).where(CandidateTag.area_id.in_([a.id for a in areas]), CandidateTag.status == "chosen")
+        select(CandidateTag).join(Candidate, Candidate.id == CandidateTag.candidate_id)
+        .where(CandidateTag.area_id.in_([a.id for a in areas]), CandidateTag.status == "chosen", Candidate.removed_at.is_(None))
         .order_by(CandidateTag.area_id, CandidateTag.id)
     ))
     by_area = {a.id: a for a in areas}

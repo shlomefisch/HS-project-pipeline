@@ -12,7 +12,7 @@ from ..timeutil import now
 
 def active_user(db: Session, user_id: int, what: str = "assignee") -> User:
     user = db.get(User, user_id)
-    if user is None or not user.active or user.role == "pending":
+    if user is None or not user.active or user.role in ("pending", "viewer"):
         raise HTTPException(422, f"The {what} must be an active, set-up user.")
     return user
 

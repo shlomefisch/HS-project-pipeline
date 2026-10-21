@@ -51,8 +51,11 @@ def holdings(db: Session, user_id: int) -> dict:
         select(ScheduledVisit).where(ScheduledVisit.rep_id == user_id, ScheduledVisit.status == "scheduled", ScheduledVisit.starts_at >= now())
         .order_by(ScheduledVisit.starts_at)
     ))
+    from ..models import Order
+
+    orders = list(db.scalars(select(Order).where(Order.handler_id == user_id, Order.stage.in_(("processing", "delivery", "closing"))).order_by(Order.id)))
     slot = db.get(AppSetting, "takeoff_user_id")
-    return {"jobs": jobs, "tasks": tasks, "visits": visits, "takeoff": bool(slot and slot.value == str(user_id))}
+    return {"jobs": jobs, "tasks": tasks, "visits": visits, "orders": orders, "takeoff": bool(slot and slot.value == str(user_id))}
 
 
 def _set_takeoff(db: Session, user_id: int | None) -> None:
@@ -172,6 +175,8 @@ def hand_over(db: Session, user_id: int, to_id: int, what: str, ids: list[int] |
             x.rep_id, x.covering_for_id = to_id, None
         elif what == "tasks":
             x.assignee_id, x.covering_for_id = to_id, None
+        elif what == "orders":
+            x.handler_id = to_id
         else:
             x.rep_id, x.covering_for_id = to_id, None
     return len(items)

@@ -99,6 +99,9 @@ def test_after_the_sale_problems_go_to_the_handler(jay, office, boss, order):
     moshe.post(f"/api/tasks/{t['id']}/complete", json={"outcome": "bad_answer", "note": "No truck till Monday", "next_step": step(office.id, "Tell the customer")})
     assert [w["title"] for w in office.get("/api/dashboard/rep").json()["went_wrong"]] == ["Book the truck"]
     assert jay.get("/api/dashboard/rep").json()["went_wrong"] == []
+    # The handler is the one who clears it.
+    assert jay.post(f"/api/tasks/{t['id']}/acknowledge").status_code == 403
+    assert office.post(f"/api/tasks/{t['id']}/acknowledge").status_code == 200
 
 
 def test_a_removed_tile_is_hidden_not_deleted(jay, order):
@@ -113,3 +116,19 @@ def test_a_removed_tile_is_hidden_not_deleted(jay, order):
     db = SessionLocal()
     assert db.get(Candidate, oops["id"]).removed_at is not None
     db.close()
+
+
+def test_a_lost_order_frees_its_areas(jay, order):
+    jid, oid, kid = order["job"]["id"], order["order"]["id"], order["kitchen"]["id"]
+    assert jay.post(f"/api/orders/{oid}/lose", json={"reason": "Went with a cheaper quote"}).status_code == 200
+    kitchen = [a for a in jay.get(f"/api/jobs/{jid}").json()["areas"] if a["id"] == kid][0]
+    assert kitchen["status"] == "decided"
+    # It can be dropped now, and the job closed out as lost instead of being stuck.
+    assert jay.patch(f"/api/areas/{kid}", json={"status": "dropped"}).status_code == 200
+
+
+def test_a_line_can_drop_to_zero_after_the_order(jay, order):
+    o = order["order"]
+    line = o["lines"][0]
+    r = jay.post(f"/api/orders/{o['id']}/quantity", json={"line_id": line["id"], "quantity": 0, "reason": "Customer took it off"})
+    assert r.status_code == 200 and r.json()["lines"][0]["quantity"] == 0.0

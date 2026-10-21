@@ -31,3 +31,12 @@ def test_without_a_key_nothing_changes(jay):
     jay.post(f"/api/jobs/{job['id']}/events", json=body)
     story = [e["summary"] for e in jay.get(f"/api/jobs/{job['id']}/timeline").json()]
     assert story.count("Twice on purpose") == 2
+
+
+def test_a_save_refused_for_sign_in_goes_through_after_signing_in(jay):
+    job = new_job(jay)
+    key = {"Idempotency-Key": "k-1234567890abcdef-0003"}
+    body = {"kind": "contact", "summary": "Sent after sign-in", "next_step": step(jay.id, "B")}
+    assert jay.client.post(f"/api/jobs/{job['id']}/events", json=body, headers=key).status_code == 401  # no session
+    r = jay.client.post(f"/api/jobs/{job['id']}/events", json=body, headers={**jay._h(), **key})
+    assert r.status_code == 201 and r.headers.get("idempotent-replay") is None

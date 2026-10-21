@@ -81,8 +81,15 @@ def acknowledge(task_id: int, db: Session = Depends(get_db), user: User = Depend
     """The rep has seen the bad news. It leaves his 'went wrong' list."""
     t = _task(db, task_id)
     job = db.get(Job, t.job_id)
-    if user.id != job.rep_id and not user.is_admin:
-        raise HTTPException(403, "Only the job's rep can acknowledge this.")
+    owner_id = job.rep_id
+    if t.order_id:
+        from ..models import Order
+
+        o = db.get(Order, t.order_id)
+        if o is not None and o.handler_id:
+            owner_id = o.handler_id  # after the sale, bad news goes to the order's handler
+    if user.id != owner_id and not user.is_admin:
+        raise HTTPException(403, "Only the person it went to can acknowledge this.")
     t.needs_rep_attention = False
     db.commit()
     return row(t)

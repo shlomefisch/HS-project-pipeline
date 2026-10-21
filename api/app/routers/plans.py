@@ -179,6 +179,8 @@ def update_file(file_id: int, body: FileUpdate, db: Session = Depends(get_db), _
         raise HTTPException(422, "A file needs a name.")
     if "kind" in data and data["kind"] is None:
         raise HTTPException(422, "Pick what kind of file it is.")
+    if "removed" in data and data["removed"] is None:
+        data.pop("removed")
     if "area_id" in data:
         _area_ok(db, data["area_id"], f.job_id)
     for k, v in data.items():
