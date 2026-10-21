@@ -17,7 +17,7 @@ def test_away_hands_everything_to_the_cover_and_back(boss, jay, office):
     r = boss.post(f"/api/users/{jay.id}/away", json={"cover_id": moshe.id, "starts_on": t0.isoformat(), "ends_on": (t0 + timedelta(days=7)).isoformat()})
     assert r.status_code == 201, r.text
     assert r.json()["current"]["status"] == "active"
-    assert r.json()["counts"] == {"jobs": 0, "tasks": 0, "visits": 0, "takeoff": 0}
+    assert r.json()["counts"] == {"jobs": 0, "tasks": 0, "visits": 0, "orders": 0, "takeoff": 0}
     detail = jay.get(f"/api/jobs/{job['id']}").json()
     assert detail["rep_id"] == moshe.id and detail["covering_for_id"] == jay.id
     assert all(t["assignee_id"] == moshe.id and t["covering_for_id"] == jay.id for t in detail["tasks"] if t["status"] == "open")
@@ -79,7 +79,7 @@ def test_gone_means_hand_over_then_deactivate(boss, jay):
     assert screen["counts"]["jobs"] == 1  # one by one
     boss.post(f"/api/users/{jay.id}/hand-over", json={"to_user_id": moshe.id, "what": "jobs"})
     screen = boss.post(f"/api/users/{jay.id}/hand-over", json={"to_user_id": moshe.id, "what": "tasks"}).json()
-    assert screen["counts"] == {"jobs": 0, "tasks": 0, "visits": 0, "takeoff": 0}
+    assert screen["counts"] == {"jobs": 0, "tasks": 0, "visits": 0, "orders": 0, "takeoff": 0}
     assert boss.patch(f"/api/users/{jay.id}", json={"active": False}).status_code == 200
     assert jay.get(f"/api/jobs/{b['id']}").status_code == 401  # signed out for good
 
