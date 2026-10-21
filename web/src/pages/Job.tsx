@@ -1,29 +1,46 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api";
 import { niceDate, niceTime, useApp, useLoad } from "../state";
 import { Empty, EntityPicker, Loading, Sheet, STATUS_LABEL, useAction, ErrorLine, Field } from "../ui";
-import type { AuditEntry, Job, Task, Visit } from "../types";
+import type { AuditEntry, Job, Progress, Task, Visit } from "../types";
 import { CompleteTask } from "./TaskActions";
-import { ProgressTiles } from "../progress";
 import { Icon } from "../icons";
 import { Selection } from "./JobSelection";
-import { Plans } from "./JobPlans";
+import { Availability, Files, Footage } from "./JobPlans";
 import { EstimateTab } from "./JobEstimate";
 import { Orders } from "./JobOrders";
-import { NowPanel, Overview, type JobTab } from "./JobOverview";
+import { NowCard, SECTION_LABEL, STAGE_SECTION, SectionList, whatNow, type Section } from "./JobOverview";
 import { AddTask, EditJob, HoldJob, LogEvent, LoseJob, ResolveVisit, ReviveJob, ScheduleVisit } from "./JobSheets";
 
-type Tab = JobTab;
 type SheetKind = null | "log" | "schedule" | "task" | "edit" | "hold" | "lose" | "revive" | "more";
 
+/** Side by side only when the job itself has room — not just a wide screen with the jobs list beside it. */
+function useRoomy(): [(el: HTMLElement | null) => void, boolean] {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [roomy, setRoomy] = useState(false);
+  useEffect(() => {
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setRoomy(e.contentRect.width >= 940));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+  return [setEl, roomy];
+}
+
+/** A job, kept simple: who and where it stands at the top, one card saying what's next,
+ *  then its parts as a list. One part is open at a time. */
 export function JobPage({ id }: { id: number }) {
   const { data: job, error, reload } = useLoad(() => api.get<Job>(`/jobs/${id}`), [id]);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [picked, setPicked] = useState<Section | null>(null);
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [logVisit, setLogVisit] = useState<Visit | null>(null);
-  const { userName } = useApp();
+  const { userName, meta } = useApp();
+  const [measure, wide] = useRoomy();
 
-  if (!job) return <main className="page"><Loading error={error} /></main>;
+  // A different job starts on its own overview.
+  useEffect(() => setPicked(null), [id]);
+
+  if (!job) return <main className="page" ref={measure}><Loading error={error} /></main>;
   const close = () => {
     setSheet(null);
     setLogVisit(null);
@@ -32,89 +49,97 @@ export function JobPage({ id }: { id: number }) {
     close();
     reload();
   };
-  const contact = job.roles.find((r) => r.entity.id === job.default_contact_id && r.active)?.entity;
+  const contactRole = job.roles.find((r) => r.entity.id === job.default_contact_id && r.active);
+  const contact = contactRole?.entity;
+  const active = job.status === "active" || job.status === "on_hold";
+  const now = whatNow(job, userName);
+  // On a PC one part is always open beside the list; on a phone, only once it's tapped.
+  const section: Section | null = picked ?? (wide ? now.go : null);
+  const go = (s: Section) => {
+    setPicked(s);
+    window.scrollTo({ top: 0 });
+  };
+
+  const header = (
+    <header className="job-top">
+      <a href="#/jobs" className="back">Jobs</a>
+      <div className="job-title-row">
+        <h1>{job.name}</h1>
+        <div className="job-title-actions">
+          {job.status === "lost" ? (
+            <button className="btn btn-primary" onClick={() => setSheet("revive")}>Bring this job back</button>
+          ) : (
+            <button className="btn btn-primary" onClick={() => setSheet("log")}>Log what happened</button>
+          )}
+          <button className="btn btn-quiet" onClick={() => setSheet("more")} aria-label="More actions">More</button>
+        </div>
+      </div>
+      <p className="job-who">
+        {contact ? (
+          <>
+            <strong>{contact.name}</strong>
+            <span className="muted"> · {meta.role_labels[contactRole!.role] ?? contactRole!.role}</span>
+            {contact.phone && (
+              <a className="job-call" href={`tel:${contact.phone}`} aria-label={`Call ${contact.name}`}>
+                <Icon name="phone" size={16} /> Call
+              </a>
+            )}
+          </>
+        ) : (
+          <span className="muted">No main contact yet</span>
+        )}
+        <span className="muted"> · Rep {userName(job.rep_id)}</span>
+      </p>
+      {job.status !== "active" && (
+        <p className={`status-banner status-${job.status}`}>
+          {STATUS_LABEL[job.status]}
+          {job.status === "on_hold" && ` until ${niceDate(job.hold_until)} — ${job.hold_reason}`}
+          {job.status === "lost" && ` — ${job.lost_reason}${job.lost_note ? `: ${job.lost_note}` : ""}`}
+        </p>
+      )}
+      <StageBar progress={job.progress} onPick={(key) => go(STAGE_SECTION[key] ?? "tiles")} />
+    </header>
+  );
+
+  const content = section && (
+    <div className="job-part-view">
+      {!wide && (
+        <button className="job-part-back" onClick={() => setPicked(null)}>‹ {job.name}</button>
+      )}
+      <h2 className="job-part-title">{SECTION_LABEL[section]}</h2>
+      {section === "tiles" && <Selection job={job} reload={reload} />}
+      {section === "footage" && <Footage job={job} reload={reload} />}
+      {section === "availability" && <Availability job={job} reload={reload} />}
+      {section === "estimate" && <EstimateTab job={job} reload={reload} />}
+      {section === "orders" && <Orders job={job} reload={reload} />}
+      {section === "files" && <Files job={job} />}
+      {section === "steps" && (
+        <Steps job={job} reload={reload} onLogVisit={(v) => { setLogVisit(v); setSheet("log"); }} onAdd={() => setSheet("task")} onBook={() => setSheet("schedule")} />
+      )}
+      {section === "people" && <People job={job} reload={reload} />}
+      {section === "history" && <Story jobId={job.id} />}
+    </div>
+  );
 
   return (
-    <main className="page job">
-      <header className="job-head">
-        <a href="#/jobs" className="back">
-          Jobs
-        </a>
-        <h1>{job.name}</h1>
-        <ProgressTiles progress={job.progress} size="large" onPick={(key) => setTab(STAGE_TAB[key] ?? "overview")} />
-        <p className="muted">
-          {[job.address && job.address !== job.name ? job.address : null, job.class_code, `Rep: ${userName(job.rep_id)}`, contact ? `Contact: ${contact.name}` : null]
-            .filter(Boolean)
-            .join(" — ")}
-        </p>
-        {job.status !== "active" && (
-          <p className={`status-banner status-${job.status}`}>
-            {STATUS_LABEL[job.status]}
-            {job.status === "on_hold" && ` until ${niceDate(job.hold_until)} — ${job.hold_reason}`}
-            {job.status === "lost" && ` — ${job.lost_reason}${job.lost_note ? `: ${job.lost_note}` : ""}`}
-          </p>
-        )}
-        {job.stuck && <p className="status-banner status-stuck">No next step. Nobody is doing anything on this job — add one.</p>}
-      </header>
-
-      {job.status !== "lost" && (
-        <div className="job-actions">
-          <button className="btn btn-primary" onClick={() => setSheet("log")}>
-            Log what happened
-          </button>
-          <button className="btn" onClick={() => setSheet("schedule")}>
-            Book a visit
-          </button>
-          <button className="btn" onClick={() => setSheet("task")}>
-            Add a step
-          </button>
-          <button className="btn btn-quiet" onClick={() => setSheet("more")} aria-label="More actions">
-            More
-          </button>
+    <main className={`page job job-simple ${wide ? "is-roomy" : ""}`} ref={measure}>
+      {(wide || !section) && header}
+      {wide ? (
+        <div className="job-split">
+          <div className="job-side">
+            {active && <NowCard job={job} onGo={go} reload={reload} />}
+            <SectionList job={job} current={section} onPick={go} />
+          </div>
+          <div className="job-content">{content}</div>
         </div>
+      ) : section ? (
+        content
+      ) : (
+        <>
+          {active && <NowCard job={job} onGo={go} reload={reload} />}
+          <SectionList job={job} current={null} onPick={go} />
+        </>
       )}
-      {job.status === "lost" && (
-        <div className="job-actions">
-          <button className="btn btn-primary" onClick={() => setSheet("revive")}>
-            Bring this job back
-          </button>
-        </div>
-      )}
-
-      {job.status !== "closed" && job.status !== "lost" && <NowPanel job={job} onGo={setTab} reload={reload} />}
-
-      <div className="job-body">
-      <div className="job-main">
-      <nav className="tabs" role="tablist">
-        {(
-          [
-            ["overview", "Overview"],
-            ["selection", "Selection"],
-            ["plans", "Plans"],
-            ["estimate", "Estimate"],
-            ...((job.orders ?? []).length ? ([["orders", "Orders"]] as [Tab, string][]) : []),
-            ["steps", `Steps ${job.open_tasks ? `(${job.open_tasks})` : ""}`],
-            ["people", "People"],
-            ["story", "Story"],
-          ] as [Tab, string][]
-        ).map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      {tab === "overview" && <Overview job={job} onGo={setTab} />}
-      {tab === "selection" && <Selection job={job} reload={reload} />}
-      {tab === "plans" && <Plans job={job} reload={reload} />}
-      {tab === "estimate" && <EstimateTab job={job} reload={reload} />}
-      {tab === "orders" && <Orders job={job} reload={reload} />}
-      {tab === "steps" && <Steps job={job} reload={reload} onLogVisit={(v) => { setLogVisit(v); setSheet("log"); }} />}
-      {tab === "people" && <People job={job} reload={reload} />}
-      {tab === "story" && <Story jobId={job.id} />}
-      </div>
-      <JobRail job={job} onSteps={() => setTab("steps")} />
-      </div>
 
       {sheet === "log" && <LogEvent job={job} visit={logVisit} onClose={close} onDone={done} />}
       {sheet === "schedule" && <ScheduleVisit job={job} onClose={close} onDone={done} />}
@@ -126,6 +151,8 @@ export function JobPage({ id }: { id: number }) {
       {sheet === "more" && (
         <Sheet title="More" onClose={close}>
           <ul className="list">
+            {job.status !== "lost" && <li><button className="row-btn" onClick={() => setSheet("task")}><strong>Add a step</strong><span className="muted">Something someone has to do, with a date</span></button></li>}
+            {job.status !== "lost" && <li><button className="row-btn" onClick={() => setSheet("schedule")}><strong>Book a visit</strong><span className="muted">Showroom or site</span></button></li>}
             <li><button className="row-btn" onClick={() => setSheet("edit")}><strong>Rename or edit details</strong><span className="muted">Name, address, department, type, how they found us</span></button></li>
             {job.status === "active" && <li><button className="row-btn" onClick={() => setSheet("hold")}><strong>Put on hold</strong><span className="muted">Paused with a date to come back</span></button></li>}
             {job.status === "on_hold" && (
@@ -136,7 +163,7 @@ export function JobPage({ id }: { id: number }) {
                 </button>
               </li>
             )}
-            <li><button className="row-btn" onClick={() => setSheet("lose")}><strong>Close as lost</strong><span className="muted">With the reason</span></button></li>
+            {job.status !== "lost" && job.status !== "closed" && <li><button className="row-btn" onClick={() => setSheet("lose")}><strong>Close as lost</strong><span className="muted">With the reason</span></button></li>}
           </ul>
         </Sheet>
       )}
@@ -144,8 +171,25 @@ export function JobPage({ id }: { id: number }) {
   );
 }
 
+/** How far along: a thin bar, one segment per stage, and the stage in words. Tap a segment to open that part. */
+function StageBar({ progress, onPick }: { progress?: Progress | null; onPick: (key: string) => void }) {
+  if (!progress) return null;
+  const n = progress.done;
+  const all = progress.stages.length;
+  return (
+    <div className="stagebar">
+      <div className="stagebar-segs" role="group" aria-label={`${n} of ${all} stages done`}>
+        {progress.stages.map((s, i) => (
+          <button key={s.key} type="button" title={s.label} aria-label={s.label} className={`stagebar-seg ${s.done ? "is-done" : i === n ? "is-now" : ""}`} onClick={() => onPick(s.key)} />
+        ))}
+      </div>
+      <span className="stagebar-text">{n >= all ? "All stages done" : <>Step {n + 1} of {all} · <strong>{progress.current}</strong></>}</span>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- steps
-function Steps({ job, reload, onLogVisit }: { job: Job; reload: () => void; onLogVisit: (v: Visit) => void }) {
+function Steps({ job, reload, onLogVisit, onAdd, onBook }: { job: Job; reload: () => void; onLogVisit: (v: Visit) => void; onAdd: () => void; onBook: () => void }) {
   const { userName } = useApp();
   const [open, setOpen] = useState<Task | null>(null);
   const [resolving, setResolving] = useState<Visit | null>(null);
@@ -156,6 +200,12 @@ function Steps({ job, reload, onLogVisit }: { job: Job; reload: () => void; onLo
 
   return (
     <section className="section">
+      {job.status !== "lost" && job.status !== "closed" && (
+        <div className="actions actions-wrap">
+          <button className="btn btn-primary" onClick={onAdd}>Add a step</button>
+          <button className="btn" onClick={onBook}>Book a visit</button>
+        </div>
+      )}
       {booked.length > 0 && (
         <>
           <h2>Booked visits</h2>
@@ -333,66 +383,3 @@ function describe(e: AuditEntry): string {
   return `${table}: ${fields}`;
 }
 
-// Tapping a progress tile goes where that stage is worked.
-const STAGE_TAB: Record<string, Tab> = {
-  lead: "overview", selection: "selection", footage: "plans", availability: "plans",
-  estimate: "estimate", ordered: "estimate", delivery: "orders", closed: "orders",
-};
-
-// ------------------------------------------- the side panel, on wide screens
-function JobRail({ job, onSteps }: { job: Job; onSteps: () => void }) {
-  const { userName, meta } = useApp();
-  const open = job.tasks.filter((t) => t.status === "open" || t.status === "blocked");
-  const upcoming = job.visits.filter((v) => v.status === "scheduled");
-  const people = job.roles.filter((r) => r.active);
-  const todayIso = new Date().toISOString().slice(0, 10);
-  return (
-    <aside className="job-rail" aria-label="At a glance">
-      <section>
-        <h3>Next steps</h3>
-        {open.length === 0 ? (
-          <p className="rail-empty">Nothing open — add the next step.</p>
-        ) : (
-          <ul>
-            {open.slice(0, 6).map((t) => (
-              <li key={t.id}>
-                <button className={`rail-item ${t.status === "blocked" ? "rail-bad" : t.due_date < todayIso ? "rail-late" : ""}`} onClick={onSteps}>
-                  <strong>{t.title}</strong>
-                  <span>{userName(t.assignee_id)} · {t.status === "blocked" ? "blocked" : niceDate(t.due_date)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      {upcoming.length > 0 && (
-        <section>
-          <h3>Visits</h3>
-          <ul>
-            {upcoming.slice(0, 3).map((v) => (
-              <li key={v.id} className="rail-line">{niceDate(v.starts_at)}, {niceTime(v.starts_at)} — {v.kind === "site" ? "site visit" : `${v.showroom ?? ""} showroom`}</li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <section>
-        <h3>People</h3>
-        <ul>
-          {people.map((r) => (
-            <li key={r.id} className="rail-person">
-              <a href={`#/people/${r.entity.id}`}>
-                <strong>{r.entity.name}</strong>
-                <span>{meta.role_labels[r.role] ?? r.role}{job.default_contact_id === r.entity.id ? " · contact" : ""}</span>
-              </a>
-              {r.entity.phone && (
-                <a className="icon-btn" href={`tel:${r.entity.phone}`} aria-label={`Call ${r.entity.name}`} title={r.entity.phone}>
-                  <Icon name="phone" size={18} />
-                </a>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-    </aside>
-  );
-}

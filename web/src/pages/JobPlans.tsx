@@ -7,45 +7,26 @@ import { chosenTiles, inSqft, num, unitOf, unitShort } from "../footage";
 
 const KIND_LABEL: Record<JobFile["kind"], string> = { plan: "Plans", photo: "Photos", note: "Notes", other: "Other" };
 
-const sf = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+const sf = num;
 const size = (b: number | null) => (b == null ? "" : b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
-/** Order assembly, first part: what the job is built from — plans, footage per area, the takeoff. */
-export function Plans({ job, reload }: { job: Job; reload: () => void }) {
+/** The footage: typed on each chosen tile. The takeoff sits here too, since that's what it fills in. */
+export function Footage({ job, reload }: { job: Job; reload: () => void }) {
   const files = useLoad(() => api.get<JobFile[]>(`/jobs/${job.id}/files`), [job.id]);
-  const [sheet, setSheet] = useState<null | "upload" | "link" | "takeoff" | { area: Area }>(null);
-  const fetching = !!files.data?.some((f) => f.status === "fetching");
-  const filesReload = files.reload;
-
-  // A pasted link is pulled in on the server; check back until it's done.
-  useEffect(() => {
-    if (!fetching) return;
-    const t = window.setInterval(filesReload, 2500);
-    return () => window.clearInterval(t);
-  }, [fetching, filesReload]);
-
+  const [sheet, setSheet] = useState<null | "takeoff" | { area: Area }>(null);
   const live = job.areas.filter((a) => a.status === "open" || a.status === "decided");
-  const tiles = live.flatMap((a) => chosenTiles(job, a.id));
-  const missing = tiles.filter(({ t }) => t.quantity == null).length;
-  const total = tiles.reduce((n, { c, t }) => n + (inSqft(unitOf(c)) ? t.quantity ?? 0 : 0), 0);
   const plans = (files.data ?? []).filter((f) => f.kind === "plan" && f.status === "ready" && (f.url || f.source === "link"));
   const done = () => {
     setSheet(null);
     reload();
-    files.reload();
   };
 
   return (
     <div className="plans">
-      {/* ---- footage ---- */}
       <section className="section">
-        <div className="section-head">
-          <h2>Footage</h2>
-          {tiles.length > 0 && <span className="muted small">{missing ? `${missing} tile${missing === 1 ? " still needs" : "s still need"} a number` : `${num(total)} sf in all`}</span>}
-        </div>
-        <p className="muted small">The number on each tile is the footage, waste included. The area size is only where a newly chosen tile starts.</p>
+        <p className="muted small">The number on each tile is the footage, waste included. The area size only fills in a tile that has no number yet.</p>
         {live.length === 0 ? (
-          <Empty>Add the areas on the Selection tab first.</Empty>
+          <Empty>Add the areas and tiles first.</Empty>
         ) : (
           <div className="footage-areas">
             {live.map((a) => {
@@ -59,7 +40,7 @@ export function Plans({ job, reload }: { job: Job; reload: () => void }) {
                     </button>
                   </div>
                   {here.length === 0 ? (
-                    <p className="muted small footage-none">No tile chosen yet — it will start at the area size.</p>
+                    <p className="muted small footage-none">No tile chosen yet.</p>
                   ) : (
                     <ul className="list">
                       {here.map(({ c, t }) => <TileNumber key={t.id} cand={c} tag={t} onSaved={reload} />)}
@@ -72,10 +53,6 @@ export function Plans({ job, reload }: { job: Job; reload: () => void }) {
         )}
       </section>
 
-      {/* ---- availability ---- */}
-      <Availability job={job} reload={reload} />
-
-      {/* ---- takeoff ---- */}
       <section className="section">
         <h2>Takeoff</h2>
         {job.open_takeoff_id ? (
@@ -83,7 +60,7 @@ export function Plans({ job, reload }: { job: Job; reload: () => void }) {
         ) : (
           <>
             <p className="muted small">
-              {plans.length ? "Plans are on the job. Send them for a takeoff when the areas are set." : "Put the plans on the job first — then the takeoff can be requested."}
+              {plans.length ? "Plans are on the job. Send them for a takeoff and the numbers come back here." : "Put the plans on the job first (Plans & files) — then a takeoff can be requested."}
             </p>
             {job.status === "active" && (
               <button className="btn" disabled={!plans.length} onClick={() => setSheet("takeoff")}>
@@ -94,29 +71,46 @@ export function Plans({ job, reload }: { job: Job; reload: () => void }) {
         )}
       </section>
 
-      {/* ---- files ---- */}
-      <section className="section">
-        <div className="section-head">
-          <h2>Plans and files</h2>
-        </div>
-        <div className="actions actions-wrap">
-          <button className="btn btn-primary" onClick={() => setSheet("upload")}>Upload or take a photo</button>
-          <button className="btn" onClick={() => setSheet("link")}>Paste a link</button>
-        </div>
-        {!files.data ? (
-          <Empty>{files.error ?? "Loading…"}</Empty>
-        ) : files.data.length === 0 ? (
-          <Empty>Nothing yet. Plans come by email, WhatsApp, paper (take a photo), Dropbox or Google Drive.</Empty>
-        ) : (
-          <FileList job={job} files={files.data} onChanged={files.reload} />
-        )}
-      </section>
-
-      {sheet === "upload" && <UploadSheet job={job} onClose={() => setSheet(null)} onDone={done} />}
-      {sheet === "link" && <LinkSheet job={job} onClose={() => setSheet(null)} onDone={done} />}
       {sheet === "takeoff" && <TakeoffSheet job={job} onClose={() => setSheet(null)} onDone={done} />}
       {sheet && typeof sheet === "object" && <FootageSheet job={job} area={sheet.area} onClose={() => setSheet(null)} onDone={done} />}
     </div>
+  );
+}
+
+/** Plans, photos and notes on the job. Links are pulled in on the server. */
+export function Files({ job }: { job: Job }) {
+  const files = useLoad(() => api.get<JobFile[]>(`/jobs/${job.id}/files`), [job.id]);
+  const [sheet, setSheet] = useState<null | "upload" | "link">(null);
+  const fetching = !!files.data?.some((f) => f.status === "fetching");
+  const filesReload = files.reload;
+
+  // A pasted link is pulled in on the server; check back until it's done.
+  useEffect(() => {
+    if (!fetching) return;
+    const t = window.setInterval(filesReload, 2500);
+    return () => window.clearInterval(t);
+  }, [fetching, filesReload]);
+
+  const done = () => {
+    setSheet(null);
+    files.reload();
+  };
+  return (
+    <section className="section">
+      <div className="actions actions-wrap">
+        <button className="btn btn-primary" onClick={() => setSheet("upload")}>Upload or take a photo</button>
+        <button className="btn" onClick={() => setSheet("link")}>Paste a link</button>
+      </div>
+      {!files.data ? (
+        <Empty>{files.error ?? "Loading…"}</Empty>
+      ) : files.data.length === 0 ? (
+        <Empty>Nothing yet. Plans come by email, WhatsApp, paper (take a photo), Dropbox or Google Drive.</Empty>
+      ) : (
+        <FileList job={job} files={files.data} onChanged={files.reload} />
+      )}
+      {sheet === "upload" && <UploadSheet job={job} onClose={() => setSheet(null)} onDone={done} />}
+      {sheet === "link" && <LinkSheet job={job} onClose={() => setSheet(null)} onDone={done} />}
+    </section>
   );
 }
 
@@ -129,7 +123,7 @@ function TakeoffStatus({ job }: { job: Job }) {
       <strong>{userName(t.assignee_id)}</strong> is on it — due {niceDate(t.due_date)}
       {t.status === "blocked" && <span className="pill pill-warn"> blocked: {t.outcome_note}</span>}
       <br />
-      <span className="muted small">It closes once every chosen tile has its number (or, before tiles are chosen, every area has its size). Finish it from the Steps tab.</span>
+      <span className="muted small">It's done once every chosen tile has its number. Finish it from Steps.</span>
     </p>
   );
 }
@@ -383,7 +377,7 @@ const AVAIL: Record<string, { label: string; cls: string }> = {
   short: { label: "Short", cls: "pill-bad" },
 };
 
-function Availability({ job, reload }: { job: Job; reload: () => void }) {
+export function Availability({ job, reload }: { job: Job; reload: () => void }) {
   const { me } = useApp();
   const [sheet, setSheet] = useState<null | { kind: "two_lots" | "confirm"; tag: Tag; cand: Candidate }>(null);
   const { busy, error, run } = useAction();
@@ -395,10 +389,6 @@ function Availability({ job, reload }: { job: Job; reload: () => void }) {
   const open = lines.filter(({ t }) => !["available", "override", "confirmed"].includes(t.avail_status ?? ""));
   return (
     <section className="section">
-      <div className="section-head">
-        <h2>Availability</h2>
-        {lines.length > 0 && <span className="muted small">{open.length ? `${open.length} to sort out` : "All set"}</span>}
-      </div>
       <p className="muted small">Our stock counts only if one lot covers it. Local: call the supplier. Overseas: confirm the lead time.</p>
       {lines.length === 0 ? (
         <Empty>Choose tiles for the areas on the Selection tab first.</Empty>
