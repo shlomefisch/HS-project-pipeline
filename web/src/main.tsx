@@ -1,4 +1,4 @@
-import { StrictMode, useCallback, useEffect, useState } from "react";
+import { useRef, StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { api, getToken, setToken, setUnauthorizedHandler } from "./api";
@@ -15,7 +15,7 @@ import { People, PersonPage } from "./pages/People";
 import { Admin } from "./pages/Admin";
 import { forgetThisPhone } from "./notify";
 import { OfflineBar } from "./OfflineBar";
-import { forgetAll } from "./offline";
+import { claimFor, forgetAll } from "./offline";
 import { AwayOrGone } from "./pages/AwayOrGone";
 import { Templates } from "./pages/Templates";
 
@@ -50,12 +50,22 @@ function Root() {
   }, [dropSession]);
 
   useEffect(() => {
-    if (me && me.role !== "pending") api.get<Meta>("/meta").then(setMeta).catch(() => {});
+    if (!me) return;
+    claimFor(me.id);
+    if (me.role === "pending" && !me.is_admin) return;
+    let stop = false;
+    let timer = 0;
+    const load = () =>
+      api.get<Meta>("/meta").then((m) => { if (!stop) setMeta(m); }).catch(() => { if (!stop) timer = window.setTimeout(load, 4000); });
+    load();
+    return () => { stop = true; window.clearTimeout(timer); };
   }, [me]);
 
+  const toastTimer = useRef(0);
   const toast = useCallback((text: string, kind: "ok" | "error" = "ok") => {
     setToastMsg({ text, kind });
-    window.setTimeout(() => setToastMsg(null), 2600);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToastMsg(null), 2600);
   }, []);
 
   if (me === undefined) return <Loading />;

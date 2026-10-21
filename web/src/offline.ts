@@ -5,7 +5,8 @@
 const OUTBOX = "pipeline.outbox";
 const FAILED = "pipeline.outbox.failed";
 const CACHE = "pipeline.cache";
-const CACHE_MAX = 60;
+const CACHE_MAX = 40;
+const OWNER = "pipeline.outbox.owner";
 
 export interface Waiting {
   id: string;
@@ -37,7 +38,8 @@ const QUEUEABLE: [string, RegExp, string][] = [
 ];
 
 // Reads worth keeping for offline: the screens people actually open.
-const CACHEABLE = [/^\/auth\/me$/, /^\/meta$/, /^\/users(\?.*)?$/, /^\/dashboard\//, /^\/jobs(\?.*)?$/, /^\/jobs\/\d+(\/(timeline|files|estimates)(\?.*)?)?$/, /^\/entities\/\d+$/];
+// Not the history: it's big, and it would crowd out the waiting saves.
+const CACHEABLE = [/^\/auth\/me$/, /^\/meta$/, /^\/users(\?.*)?$/, /^\/dashboard\//, /^\/jobs(\?.*)?$/, /^\/jobs\/\d+(\/(files|estimates))?$/, /^\/entities\/\d+$/];
 
 export function queueLabel(method: string, path: string): string | null {
   const hit = QUEUEABLE.find(([m, re]) => m === method && re.test(path));
@@ -63,7 +65,14 @@ function write(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* storage full or blocked: the save still works online */
+    if (key === CACHE) return; // a full cache just means less to read offline
+    // Storage full: the read cache goes first — a waiting save matters more than an old screen.
+    try {
+      localStorage.removeItem(CACHE);
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      throw new Error("This phone's storage is full, so the save couldn't be kept. Try again with signal.");
+    }
   }
 }
 
@@ -105,7 +114,24 @@ export function dismissFailed(id: string): void {
   changed();
 }
 
+/** Saves belong to whoever made them. Someone else signing in on this phone doesn't send them as their own. */
+export function claimFor(userId: number): void {
+  let owner: string | null = null;
+  try {
+    owner = localStorage.getItem(OWNER);
+  } catch {
+    return;
+  }
+  if (owner && owner !== String(userId)) forgetAll();
+  try {
+    localStorage.setItem(OWNER, String(userId));
+  } catch {
+    /* fine */
+  }
+}
+
 type Sender = (w: Waiting) => Promise<{ ok: boolean; status: number; message: string }>;
+let retryTimer = 0;
 let sending = false;
 
 /** Sends what's waiting, oldest first. Stops at the first sign the signal is still gone. */
@@ -125,6 +151,12 @@ export async function flush(send: Sender): Promise<void> {
       }
       setOffline(false);
       if (r.status === 401) break; // signed out: keep it until they sign back in
+      if (r.status >= 500 || r.status === 429) {
+        // The server had a moment (a deploy, a first try still running): keep it, in order, and try again soon.
+        window.clearTimeout(retryTimer);
+        retryTimer = window.setTimeout(() => void flush(send), 15000);
+        break;
+      }
       write(OUTBOX, waiting().filter((w) => w.id !== next.id));
       if (!r.ok) write(FAILED, [...failed(), { ...next, error: r.message }]);
       changed();
@@ -153,6 +185,7 @@ export function forgetAll(): void {
     localStorage.removeItem(CACHE);
     localStorage.removeItem(OUTBOX);
     localStorage.removeItem(FAILED);
+    localStorage.removeItem(OWNER);
   } catch {
     /* nothing to do */
   }

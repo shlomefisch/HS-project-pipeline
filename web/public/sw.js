@@ -2,7 +2,8 @@
 const CACHE = "pipeline-__VERSION__";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/manifest.webmanifest"])));
+  // The page and the exact files it loads, so the app opens with no signal right after an update.
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/manifest.webmanifest", ...__ASSETS__])));
   self.skipWaiting();
 });
 
@@ -17,15 +18,17 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;
 
-  // Fingerprinted bundles never change: cache first.
-  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/")) {
+  // Fingerprinted bundles and brand pictures never change: cache first.
+  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/") || url.pathname.startsWith("/brand/")) {
     event.respondWith(
       caches.match(event.request).then(
         (hit) =>
           hit ||
           fetch(event.request).then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(event.request, copy));
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(event.request, copy));
+            }
             return res;
           }),
       ),
@@ -33,12 +36,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Pages: network first, fall back to the cached shell.
+  // Only the app page itself is kept as the shell — never a picture, and never an error page.
+  if (event.request.mode !== "navigate") return;
   event.respondWith(
     fetch(event.request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put("/", copy));
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put("/", copy));
+        }
         return res;
       })
       .catch(() => caches.match("/")),

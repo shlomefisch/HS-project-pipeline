@@ -3,7 +3,7 @@ import { api } from "../api";
 import { niceDate, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Loading, Sheet, useAction } from "../ui";
 import type { Estimate, EstimateLine, Job } from "../types";
-import { chosenTiles, inSqft, unitOf } from "../footage";
+import { chosenTiles, inSqft, parseNum, unitOf } from "../footage";
 import { SendEstimate } from "./SendEstimate";
 import { celebrateHere } from "../celebrate";
 
@@ -168,7 +168,7 @@ function LineSheet({ line, onClose, onDone }: { line: EstimateLine; onClose: () 
         )}
         <button
           className="btn btn-primary"
-          disabled={busy || !qty || Number(qty) <= 0 || price === ""}
+          disabled={busy || !qty || !parseNum(qty).ok || Number(qty) <= 0 || price === "" || !parseNum(price).ok}
           onClick={() => run(async () => { await api.patch(`/estimate-lines/${line.id}`, { quantity: Number(qty), price: Number(price), price_note: changed ? note || null : null }); onDone(); })}
         >
           Save

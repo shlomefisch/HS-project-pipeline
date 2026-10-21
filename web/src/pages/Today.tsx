@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import { go, niceDate, niceTime, useApp, useLoad } from "../state";
-import { Empty, Loading } from "../ui";
+import { Empty, ErrorLine, Loading, useAction } from "../ui";
 import type { Job, Task, User, Visit } from "../types";
 import { ChangePasswordSheet } from "./Login";
 import { NotificationsBox } from "../notify";
@@ -150,17 +150,7 @@ function RepDashboard() {
                     {t.job_name} — {t.status === "blocked" ? "Blocked" : "Bad answer"}: {t.outcome_note}
                   </span>
                 </a>
-                {t.needs_rep_attention && (
-                  <button
-                    className="btn btn-small"
-                    onClick={async () => {
-                      await api.post(`/tasks/${t.id}/acknowledge`);
-                      reload();
-                    }}
-                  >
-                    Seen
-                  </button>
-                )}
+                {t.needs_rep_attention && <SeenButton taskId={t.id} onDone={reload} />}
               </li>
             ))}
           </ul>
@@ -291,5 +281,18 @@ function OfficeDashboard() {
         />
       )}
     </section>
+  );
+}
+
+/** Clears bad news off your list. Shows why if it can't. */
+function SeenButton({ taskId, onDone }: { taskId: number; onDone: () => void }) {
+  const { busy, error, run } = useAction();
+  return (
+    <span className="seen">
+      <button className="btn btn-small" disabled={busy} onClick={() => run(async () => { await api.post(`/tasks/${taskId}/acknowledge`); onDone(); })}>
+        Seen
+      </button>
+      <ErrorLine error={error} />
+    </span>
   );
 }

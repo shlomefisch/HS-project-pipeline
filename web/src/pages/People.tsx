@@ -174,8 +174,9 @@ function MergeInto({ target, onClose, onDone }: { target: Entity; onClose: () =>
   const { busy, error, run } = useAction();
   useEffect(() => {
     if (!q.trim()) return setResults([]);
-    const t = window.setTimeout(() => api.get<Entity[]>("/entities", { q }).then((r) => setResults(r.filter((x) => x.id !== target.id))), 200);
-    return () => window.clearTimeout(t);
+    let live = true;
+    const t = window.setTimeout(() => api.get<Entity[]>("/entities", { q }).then((r) => { if (live) setResults(r.filter((x) => x.id !== target.id)); }).catch(() => {}), 200);
+    return () => { live = false; window.clearTimeout(t); };
   }, [q, target.id]);
   return (
     <Sheet title={`Merge into ${target.name}`} onClose={onClose}>

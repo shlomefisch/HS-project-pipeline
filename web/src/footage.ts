@@ -10,3 +10,15 @@ export const num = (n: number) => n.toLocaleString(undefined, { maximumFractionD
 export function chosenTiles(job: Job, areaId: number): { c: Candidate; t: Tag }[] {
   return job.candidates.flatMap((c) => c.tags.filter((t) => t.area_id === areaId && t.status === "chosen").map((t) => ({ c, t })));
 }
+
+/** A typed number: "" means empty on purpose; anything that isn't a plain positive number is refused. */
+export function parseNum(text: string): { ok: true; value: number | null } | { ok: false } {
+  const t = text.trim();
+  if (t === "") return { ok: true, value: null };
+  if (!/^\d+(\.\d+)?$|^\.\d+$/.test(t)) return { ok: false };
+  const v = Number(t);
+  return Number.isFinite(v) ? { ok: true, value: v } : { ok: false };
+}
+
+/** A footage box that can be saved: empty (clears it) or a number above zero. */
+export const okQty = (text: string) => { const n = parseNum(text); return n.ok && n.value !== 0; };

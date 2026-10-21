@@ -4,6 +4,7 @@ import { api } from "../api";
 import { go, niceDate, niceTime, plusDays, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Sheet, useAction } from "../ui";
 import type { Area, Candidate, Item, Job, Sample, Stock, Tag } from "../types";
+import { inSqft, okQty, parseNum, unitOf, unitShort } from "../footage";
 
 const SOURCE_SHORT: Record<string, string> = { stock: "Stock", local: "Local", overseas: "Overseas" };
 const SAMPLE_SHORT: Record<Sample["status"], string> = { requested: "sample to send", sent: "sample sent", replied: "sample back", cancelled: "" };
@@ -75,7 +76,7 @@ export function Selection({ job, reload }: { job: Job; reload: () => void }) {
                       <span className="tile-meta">
                         {SOURCE_SHORT[c.source]}
                         {c.source === "overseas" ? (c.lead_time_weeks != null ? `, ${c.lead_time_weeks} wks` : ", lead time?") : ""}
-                        {t.quantity != null ? `, ${t.quantity} ${t.unit}` : ""}
+                        {t.quantity != null ? `, ${t.quantity} ${unitShort(unitOf(c))}` : ""}
                         {t.status === "chosen" ? ", chosen" : ""}
                         {t.status === "declined" && t.reason ? `, ${t.reason}` : ""}
                       </span>
@@ -329,10 +330,10 @@ function TagSheet({ job, tag, cand, onClose, onDone }: { job: Job; tag: Tag; can
         </>
       )}
       {isReal && !declining && (
-        <Field label={`Quantity for ${area?.name} (sf, waste included)`}>
+        <Field label={`Footage for ${area?.name} (${unitShort(unitOf(cand))}${inSqft(unitOf(cand)) ? ", waste included" : ""})`}>
           <div className="inline">
             <input inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, ""))} />
-            <button className="btn btn-small" disabled={busy} onClick={() => set({ quantity: qty ? Number(qty) : null })}>Save</button>
+            <button className="btn btn-small" disabled={busy || !okQty(qty)} onClick={() => { const n = parseNum(qty); if (n.ok) set({ quantity: n.value }); }}>Save</button>
           </div>
         </Field>
       )}

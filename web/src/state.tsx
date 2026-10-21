@@ -15,7 +15,7 @@ export function useRoute(): string[] {
 }
 
 export function go(path: string) {
-  location.hash = `#/${path}`;
+  location.hash = `#/${path.replace(/^\/+/, "")}`;
 }
 
 // ---------------------------------------------------------- app state

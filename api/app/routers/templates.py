@@ -85,7 +85,9 @@ def edit_step(step_id: int, body: StepPatch, db: Session = Depends(get_db), _: U
             raise HTTPException(422, f"{key.replace('_', ' ').capitalize()} can't be empty.")
     kind = data.get("assignee_kind", s.assignee_kind)
     uid = data.get("assignee_user_id", s.assignee_user_id)
-    _check(db, kind, uid)
+    # Switching a step off never needs its person to still be around.
+    if set(data) - {"active", "sort_order"}:
+        _check(db, kind, uid)
     if kind != "user":
         data["assignee_user_id"] = None
     for k, v in data.items():

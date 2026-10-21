@@ -31,11 +31,14 @@ def for_jobs(db: Session, job_ids: list[int]) -> dict[int, dict]:
         .where(CandidateTag.job_id.in_(job_ids), CandidateTag.status == "chosen", Candidate.removed_at.is_(None))
     ):
         chosen.setdefault(t.area_id, []).append(t)
+    # A lost order, and the estimate it came from, are history — not progress.
+    lost_est = set(db.scalars(select(Order.estimate_id).where(Order.job_id.in_(job_ids), Order.stage == "lost")))
     est: dict[int, set[str]] = {}
-    for jid, status in db.execute(select(Estimate.job_id, Estimate.status).where(Estimate.job_id.in_(job_ids), Estimate.status != "discarded")):
-        est.setdefault(jid, set()).add(status)
+    for eid, jid, status in db.execute(select(Estimate.id, Estimate.job_id, Estimate.status).where(Estimate.job_id.in_(job_ids), Estimate.status != "discarded")):
+        if eid not in lost_est:
+            est.setdefault(jid, set()).add(status)
     stages: dict[int, set[str]] = {}
-    for jid, stage in db.execute(select(Order.job_id, Order.stage).where(Order.job_id.in_(job_ids))):
+    for jid, stage in db.execute(select(Order.job_id, Order.stage).where(Order.job_id.in_(job_ids), Order.stage != "lost")):
         stages.setdefault(jid, set()).add(stage)
     closed_jobs = set(db.scalars(select(Job.id).where(Job.id.in_(job_ids), Job.status == "closed")))
     # Ordered or delivered areas still count as selected and measured: they got there.

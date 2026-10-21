@@ -38,7 +38,8 @@ function writeIndex(metafile) {
   writeFileSync(`${out}/index.html`, html);
   // A new build changes the service worker, so phones pick up the update.
   const version = createHash("sha1").update(outputs.join("|")).digest("hex").slice(0, 10);
-  const sw = readFileSync("public/sw.js", "utf8").replace("__VERSION__", version);
+  const files = outputs.filter((f) => !f.endsWith(".map")).map((f) => "/" + f.replace(`${out}/`, ""));
+  const sw = readFileSync("public/sw.js", "utf8").replace("__VERSION__", version).replace("...__ASSETS__", files.map((f) => JSON.stringify(f)).join(", "));
   writeFileSync(`${out}/sw.js`, sw);
 }
 

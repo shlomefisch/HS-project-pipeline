@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { niceDate, useApp } from "../state";
+import { isoDate, niceDate, useApp } from "../state";
 import type { Job, Task } from "../types";
 import { Icon } from "../icons";
 import { CompleteTask } from "./TaskActions";
@@ -12,7 +12,7 @@ const GOOD = ["available", "override", "confirmed"];
 const working = (job: Job) => job.areas.filter((a) => a.status === "open" || a.status === "decided");
 const names = (list: { name: string }[]) =>
   list.length <= 2 ? list.map((a) => a.name).join(" and ") : `${list.slice(0, 2).map((a) => a.name).join(", ")} and ${list.length - 2} more`;
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => isoDate(new Date());
 
 /** Which stage of the progress bar each part belongs to, and back. */
 export const STAGE_SECTION: Record<string, Section> = {
@@ -29,6 +29,7 @@ export function whatNow(job: Job, userName: (id: number | null | undefined) => s
     case "selection": {
       if (job.areas.length === 0) return { stage: "Selection", text: "Add the rooms they talked about, then the tiles they looked at.", go: "tiles", button: "Add the areas" };
       const missing = live.filter((a) => chosenTiles(job, a.id).length === 0);
+      if (missing.length === 0) return { stage: "Selection", text: "Every area is on hold or dropped. Reopen one, or add a new area.", go: "tiles", button: "Open tiles" };
       return { stage: "Selection", text: `Choose a tile for ${names(missing)}.`, go: "tiles", button: "Choose tiles" };
     }
     case "footage": {

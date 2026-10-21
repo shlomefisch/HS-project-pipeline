@@ -21,12 +21,17 @@ declare global {
 export function Scan({ jobId }: { jobId: number | null }) {
   const [scanned, setScanned] = useState<Resolved | null>(null);
   const [pickedJob, setPickedJob] = useState<number | null>(jobId);
+  const [attempt, setAttempt] = useState(0);
   const { error, run } = useAction();
 
   const resolve = (code: string) =>
     run(async () => {
-      const r = await api.get<Resolved>("/items/resolve", { code });
-      setScanned(r);
+      try {
+        const r = await api.get<Resolved>("/items/resolve", { code });
+        setScanned(r);
+      } finally {
+        setAttempt((n) => n + 1); // the camera stops on a read; a miss starts it again
+      }
     });
 
   return (
@@ -36,7 +41,7 @@ export function Scan({ jobId }: { jobId: number | null }) {
       </header>
       {!scanned ? (
         <>
-          <Camera onCode={resolve} />
+          <Camera key={attempt} onCode={resolve} />
           <ManualCode onCode={resolve} />
           <ErrorLine error={error} />
         </>

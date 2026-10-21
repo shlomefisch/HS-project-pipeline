@@ -116,6 +116,7 @@ async function request<T>(method: string, path: string, body?: unknown, params?:
 export function flushOutbox(): Promise<void> {
   return flush(async (w: Waiting) => {
     const res = await send(w.method, `/api${w.path}`, w.body, w.id);
+    if (res.status === 401) onUnauthorized(); // sign back in; the save waits
     const data = (await parse(res)) as { detail?: unknown } | null;
     return { ok: res.ok, status: res.status, message: res.ok ? "" : messageFrom(data?.detail ?? data) };
   });

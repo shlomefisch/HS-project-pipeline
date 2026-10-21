@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { niceDate, niceTime, useApp, useLoad } from "../state";
+import { isoDate, niceDate, niceTime, useApp, useLoad } from "../state";
 import { Empty, EntityPicker, Loading, Sheet, STATUS_LABEL, useAction, ErrorLine, Field } from "../ui";
 import type { AuditEntry, Job, Progress, Task, Visit } from "../types";
 import { CompleteTask } from "./TaskActions";
@@ -36,6 +36,7 @@ export function JobPage({ id }: { id: number }) {
   const [logVisit, setLogVisit] = useState<Visit | null>(null);
   const { userName, meta } = useApp();
   const [measure, wide] = useRoomy();
+  const moreAction = useAction();
 
   // A different job starts on its own overview.
   useEffect(() => setPicked(null), [id]);
@@ -157,7 +158,7 @@ export function JobPage({ id }: { id: number }) {
             {job.status === "active" && <li><button className="row-btn" onClick={() => setSheet("hold")}><strong>Put on hold</strong><span className="muted">Paused with a date to come back</span></button></li>}
             {job.status === "on_hold" && (
               <li>
-                <button className="row-btn" onClick={async () => { await api.post(`/jobs/${job.id}/resume`); done(); }}>
+                <button className="row-btn" disabled={moreAction.busy} onClick={() => moreAction.run(async () => { await api.post(`/jobs/${job.id}/resume`); done(); })}>
                   <strong>Take off hold</strong>
                   <span className="muted">Back to active now</span>
                 </button>
@@ -165,6 +166,7 @@ export function JobPage({ id }: { id: number }) {
             )}
             {job.status !== "lost" && job.status !== "closed" && <li><button className="row-btn" onClick={() => setSheet("lose")}><strong>Close as lost</strong><span className="muted">With the reason</span></button></li>}
           </ul>
+          <ErrorLine error={moreAction.error} />
         </Sheet>
       )}
     </main>
@@ -237,7 +239,7 @@ function Steps({ job, reload, onLogVisit, onAdd, onBook }: { job: Job; reload: (
       ) : (
         <ul className="list">
           {openTasks.map((t) => (
-            <li key={t.id} className={`task-row ${t.status === "blocked" ? "task-alert" : ""} ${t.due_date < new Date().toISOString().slice(0, 10) ? "task-overdue" : ""}`}>
+            <li key={t.id} className={`task-row ${t.status === "blocked" ? "task-alert" : ""} ${t.due_date < isoDate(new Date()) ? "task-overdue" : ""}`}>
               <button className="row-btn" onClick={() => setOpen({ ...t, job_name: job.name, job_rep_id: job.rep_id })}>
                 <strong>{t.title}</strong>{t.covering_for_id ? <span className="covering"> covering for {userName(t.covering_for_id)}</span> : null}
                 <span className="muted">

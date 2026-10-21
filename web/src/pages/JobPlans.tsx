@@ -3,7 +3,7 @@ import { api } from "../api";
 import { niceDate, niceTime, plusDays, useApp, useLoad } from "../state";
 import { Empty, ErrorLine, Field, Sheet, UserSelect, useAction } from "../ui";
 import type { AppSettings, Area, Candidate, Job, JobFile, Tag } from "../types";
-import { chosenTiles, inSqft, num, unitOf, unitShort } from "../footage";
+import { chosenTiles, num, parseNum, unitOf, unitShort } from "../footage";
 
 const KIND_LABEL: Record<JobFile["kind"], string> = { plan: "Plans", photo: "Photos", note: "Notes", other: "Other" };
 
@@ -290,7 +290,12 @@ function TileNumber({ cand, tag, onSaved }: { cand: Candidate; tag: Tag; onSaved
   useEffect(() => setValue(saved), [saved]);
   const save = () => {
     if (value === saved || busy) return;
-    run(async () => { await api.patch(`/tags/${tag.id}`, { quantity: value ? Number(value) : null }); onSaved(); });
+    const n = parseNum(value);
+    if (!n.ok || n.value === 0) {
+      run(async () => { throw new Error("That isn't a number. Type it like 420 or 420.5."); });
+      return;
+    }
+    run(async () => { await api.patch(`/tags/${tag.id}`, { quantity: n.value }); onSaved(); });
   };
   return (
     <li className="tile-number">
